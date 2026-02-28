@@ -7,6 +7,9 @@ import com.academic.platform.repository.UserRepository;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.InputStream;
@@ -37,6 +40,13 @@ public class UserService {
     @Autowired
     private com.academic.platform.utils.SecurityUtils securityUtils;
 
+    /**
+     * Scalability: @Cacheable prevents repeated DB hits for the SAME user across
+     * multiple API requests. The FirebaseTokenFilter calls this on EVERY request;
+     * caching it is one of the highest-impact optimisations in this codebase.
+     */
+    @Cacheable(value = "users", key = "#uid")
+    @Transactional(readOnly = true)
     public Optional<User> getUserByFirebaseUid(String uid) {
         Optional<User> userOpt = userRepository.findByFirebaseUid(uid);
         if (userOpt.isPresent()) {
@@ -50,23 +60,31 @@ public class UserService {
         return userOpt;
     }
 
+    @Transactional(readOnly = true)
     public List<User> getUsersByRole(Role role) {
         return userRepository.findByRole(role);
     }
 
+    @Cacheable(value = "faculty", key = "'all'")
+    @Transactional(readOnly = true)
     public List<User> getPotentialFaculty() {
         return userRepository.findByRoleIn(List.of(Role.TEACHER, Role.MENTOR, Role.HOD, Role.PRINCIPAL));
     }
 
+    @Cacheable(value = "users", key = "'mentees-' + #mentorUid")
+    @Transactional(readOnly = true)
     public List<User> getMenteesByMentor(String mentorUid) {
         return userRepository.findByStudentDetails_Mentor_FirebaseUid(mentorUid);
     }
 
+    @Cacheable(value = "faculty", key = "#department")
+    @Transactional(readOnly = true)
     public List<User> getFacultyByDepartment(String department) {
         return userRepository.findByStudentDetails_DepartmentIgnoreCaseAndRoleIn(department,
                 List.of(Role.TEACHER, Role.MENTOR));
     }
 
+    @Transactional(readOnly = true)
     public List<User> getStudentsByDepartment(String department) {
         return userRepository.findByStudentDetails_DepartmentIgnoreCaseAndRoleIn(department, List.of(Role.STUDENT));
     }
@@ -352,6 +370,8 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @CacheEvict(value = "users", key = "#uid")
+    @Transactional
     public User updateUser(String uid, User updates) {
         User user = userRepository.findByFirebaseUid(uid)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -419,6 +439,8 @@ public class UserService {
         return emptyNames.toArray(result);
     }
 
+    @CacheEvict(value = "users", key = "#uid")
+    @Transactional
     public void deleteUser(String uid) {
         User user = userRepository.findByFirebaseUid(uid)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -482,18 +504,16 @@ public class UserService {
         return userRepository.save(dummy);
     }
 
-    // Helper to log actions if context is available
-    private void logAdminAction(String action, String details) {
+    /**
+     * Scalability: Audit logging is now asynchronous so it never delays
+     * the HTTP response thread. The @Async annotation routes it to the
+     * dedicated 'auditExecutor' thread pool defined in AsyncConfig.
+     */
+    @Async("auditExecutor")
+    public void logAdminAction(String action, String details) {
         try {
             String uid = securityUtils.getCurrentUserUid();
-            // If calling from unexpected context, uid might be null
             if (uid != null) {
-                // We need email, but securityUtils only gives UID usually.
-                // We can fetch user email or just log UID.
-                // Optimistically fetching from repo might act recursive or slow?
-                // For audit, just UID is okay, but Email is nicer.
-                // Let's settle for UID here to avoid complexity or inject repo again.
-                // Actually UserService has repo.
                 String email = "system";
                 Optional<User> actor = userRepository.findByFirebaseUid(uid);
                 if (actor.isPresent()) {
@@ -502,7 +522,7 @@ public class UserService {
                 auditLogService.log(uid, email, action, details, "unknown-ip");
             }
         } catch (Exception e) {
-            // checking security context might fail if scheduled task etc.
+            // Async context; security context may not propagate — acceptable.
         }
     }
 }

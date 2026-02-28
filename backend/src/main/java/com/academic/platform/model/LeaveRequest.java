@@ -3,6 +3,7 @@ package com.academic.platform.model;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "leave_requests")
@@ -18,6 +19,8 @@ public class LeaveRequest {
     private String leaveType; // Medical, Personal, etc.
     private LocalDate fromDate;
     private LocalDate toDate;
+    private LocalTime fromTime; // planned gate-out time
+    private LocalTime toTime; // planned gate-in time
 
     private String reason;
     private String parentEmail;
@@ -105,6 +108,22 @@ public class LeaveRequest {
 
     public void setToDate(LocalDate toDate) {
         this.toDate = toDate;
+    }
+
+    public LocalTime getFromTime() {
+        return fromTime;
+    }
+
+    public void setFromTime(LocalTime fromTime) {
+        this.fromTime = fromTime;
+    }
+
+    public LocalTime getToTime() {
+        return toTime;
+    }
+
+    public void setToTime(LocalTime toTime) {
+        this.toTime = toTime;
     }
 
     public String getReason() {

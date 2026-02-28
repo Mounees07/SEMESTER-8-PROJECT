@@ -2,13 +2,23 @@ package com.academic.platform.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        // Scalability: Index on firebaseUid — used on every single authenticated
+        // request
+        @Index(name = "idx_users_firebase_uid", columnList = "firebaseUid"),
+        // Scalability: Index on role — used by every role-filtered query (students,
+        // teachers, etc.)
+        @Index(name = "idx_users_role", columnList = "role"),
+        // Scalability: Index on email — used for login and bulk-register lookups
+        @Index(name = "idx_users_email", columnList = "email")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -38,6 +48,7 @@ public class User {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JsonUnwrapped
     @JsonIgnoreProperties("user")
+    @EqualsAndHashCode.Exclude
     private StudentDetails studentDetails = new StudentDetails();
 
     private java.time.LocalDateTime createdAt;

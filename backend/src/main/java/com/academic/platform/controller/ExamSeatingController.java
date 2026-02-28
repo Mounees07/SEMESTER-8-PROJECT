@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -21,16 +22,24 @@ public class ExamSeatingController {
             @RequestParam("examId") Long examId,
             @RequestParam("file") MultipartFile file) {
         try {
-            System.out.println("Received allocation request for Exam ID: " + examId);
-            System.out.println("File: " + file.getOriginalFilename() + ", Size: " + file.getSize());
-
             List<ExamSeating> seatings = examSeatingService.processSeatingUpload(examId, file);
             return ResponseEntity.ok(seatings);
         } catch (Exception e) {
-            System.err.println("Error in allocateSeating: " + e.getMessage());
-            e.printStackTrace();
-            // Return simple map
-            return ResponseEntity.badRequest().body(java.util.Collections.singletonMap("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Smart auto-allocation: alternates students by dept + section.
+     * No CSV needed — the system picks students from the database automatically.
+     */
+    @PostMapping("/auto-allocate")
+    public ResponseEntity<?> autoAllocate(@RequestParam("examId") Long examId) {
+        try {
+            List<ExamSeating> seatings = examSeatingService.autoAllocate(examId);
+            return ResponseEntity.ok(seatings);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
         }
     }
 

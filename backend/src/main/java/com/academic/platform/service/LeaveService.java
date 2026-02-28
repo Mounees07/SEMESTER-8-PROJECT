@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 public class LeaveService {
@@ -196,11 +198,76 @@ public class LeaveService {
         List<LeaveRequest> leaves = leaveRepository.findByStudentStudentDetails_RollNumber(rollNumber);
         java.time.LocalDate today = java.time.LocalDate.now();
 
-        return leaves.stream()
-                .filter(l -> "APPROVED".equals(l.getMentorStatus())) // Only approved leaves
-                .filter(l -> !today.isBefore(l.getFromDate()) && !today.isAfter(l.getToDate())) // Within date range
-                .findFirst() // Assume one active leave at a time
-                .orElse(null);
+        // Priority 1: Student has exited but NOT yet returned (most urgent — overdue /
+        // in transit)
+        java.util.Optional<LeaveRequest> notReturned = leaves.stream()
+                .filter(l -> "APPROVED".equals(l.getMentorStatus()))
+                .filter(l -> l.getActualExitTime() != null && l.getActualReturnTime() == null)
+                .findFirst();
+        if (notReturned.isPresent())
+            return notReturned.get();
+
+        // Priority 2: Leave is active today and student hasn't exited yet
+        java.util.Optional<LeaveRequest> activeToday = leaves.stream()
+                .filter(l -> "APPROVED".equals(l.getMentorStatus()))
+                .filter(l -> l.getActualReturnTime() == null)
+                .filter(l -> !today.isBefore(l.getFromDate()) && !today.isAfter(l.getToDate()))
+                .findFirst();
+        if (activeToday.isPresent())
+            return activeToday.get();
+
+        // Priority 3: Upcoming approved leave (from date in the future, not yet
+        // completed)
+        java.util.Optional<LeaveRequest> upcoming = leaves.stream()
+                .filter(l -> "APPROVED".equals(l.getMentorStatus()))
+                .filter(l -> l.getActualReturnTime() == null)
+                .filter(l -> today.isBefore(l.getFromDate()))
+                .min(java.util.Comparator.comparing(LeaveRequest::getFromDate)); // nearest upcoming
+        return upcoming.orElse(null);
+    }
+
+    public List<LeaveRequest> getLeavesByDate(java.time.LocalDate date) {
+        return leaveRepository.findApprovedLeavesByDate(date);
+    }
+
+    public List<LeaveRequest> searchLeavesByRollOrName(String query) {
+        if (query == null || query.trim().isEmpty())
+            return java.util.Collections.emptyList();
+        String q = query.trim();
+
+        // Run both queries separately to avoid complex JPQL join issues
+        List<LeaveRequest> byRoll = leaveRepository.findApprovedLeavesByRoll(q);
+        List<LeaveRequest> byName = leaveRepository.findApprovedLeavesByName(q);
+
+        // Merge + deduplicate by leave ID, preserve order (most recent first)
+        java.util.LinkedHashMap<Long, LeaveRequest> merged = new java.util.LinkedHashMap<>();
+        for (LeaveRequest l : byRoll)
+            merged.put(l.getId(), l);
+        for (LeaveRequest l : byName)
+            merged.putIfAbsent(l.getId(), l);
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime cutoff24h = LocalDateTime.now().minusHours(24);
+
+        // Gate-security visibility rules:
+        // 1. PENDING (never exited): hide if toDate has already passed (leave expired)
+        // 2. OUT (exited, not returned): always visible — student is outside
+        // 3. RETURNED: hide after 24 hours of actual return time
+        return merged.values().stream().filter(l -> {
+            boolean hasExited = l.getActualExitTime() != null;
+            boolean hasReturned = l.getActualReturnTime() != null;
+
+            if (!hasExited && !hasReturned) {
+                // PENDING: only show if leave period hasn't ended yet
+                return !l.getToDate().isBefore(today);
+            }
+            if (hasExited && !hasReturned) {
+                // OUT: always show
+                return true;
+            }
+            // RETURNED: show only within 24 hours of return
+            return l.getActualReturnTime().isAfter(cutoff24h);
+        }).collect(java.util.stream.Collectors.toList());
     }
 
     public LeaveRequest updateSecurityExitEntry(Long leaveId, String action) {

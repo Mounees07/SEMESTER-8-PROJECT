@@ -60,6 +60,8 @@ public class SystemSettingService {
 
         // --- 1. Policy & Governance ---
         ensureDefault("policy.attendance.threshold", "75", "Minimum attendance percentage");
+        ensureDefault("policy.attendance.detain", "65", "Detain students below this attendance %");
+        ensureDefault("policy.leave.maxDays", "10", "Maximum leave days per semester");
         ensureDefault("policy.password.minLength", "8", "Minimum password length");
         ensureDefault("policy.password.complexity", "strong", "Password strength requirement");
         ensureDefault("policy.dataRetention", "365", "Days to retain logs/records");
@@ -82,6 +84,10 @@ public class SystemSettingService {
         ensureDefault("feature.result.enabled", "true", "Enable results module");
         ensureDefault("feature.analytics.enabled", "true", "Enable analytics dashboard");
         ensureDefault("feature.messaging.enabled", "true", "Enable internal messaging");
+        ensureDefault("feature.courseRegistration.enabled", "true", "Allow students to self-register faculty");
+        ensureDefault("feature.assignments.enabled", "true", "Enable assignment submission module");
+        ensureDefault("feature.finance.enabled", "true", "Enable finance / fee payment module");
+        ensureDefault("feature.examSeating.enabled", "true", "Enable COE exam seating allocation");
 
         // --- 4. Rate Limiting ---
         ensureDefault("security.api.rateLimit", "100", "Requests per minute");
@@ -176,6 +182,8 @@ public class SystemSettingService {
                     key.equals("siteName") ||
                     key.equals("allowRegistration") ||
                     key.equals("maintenanceMode") ||
+                    key.equals("emailNotifications") ||
+                    key.equals("report.export.enabled") ||
                     key.equals("defaultLanguage") ||
                     key.startsWith("ui.")) {
                 publicSettings.put(key, entry.getValue());

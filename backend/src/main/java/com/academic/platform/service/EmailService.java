@@ -3,8 +3,17 @@ package com.academic.platform.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/**
+ * EmailService — all send methods are @Async.
+ *
+ * Scalability: Email sending is a slow I/O operation (100-3000ms SMTP round trip).
+ * Making every send method async means the HTTP response returns immediately
+ * while the email is dispatched in the background 'emailExecutor' thread pool.
+ * This prevents a slow/unavailable mail server from degrading the entire platform.
+ */
 @Service
 public class EmailService {
 
@@ -14,6 +23,7 @@ public class EmailService {
     @Autowired
     private SystemSettingService systemSettingService;
 
+    @Async("emailExecutor")
     public void sendHtmlEmail(String to, String subject, String htmlBody) {
         if ("false".equalsIgnoreCase(systemSettingService.getSetting("emailNotifications"))) {
             System.out.println("Email notifications are disabled. Skipping email to: " + to);
@@ -38,6 +48,7 @@ public class EmailService {
         }
     }
 
+    @Async("emailExecutor")
     public void sendMeetingNotification(String to, String mentorName, String title, String time, String location) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
@@ -58,6 +69,7 @@ public class EmailService {
         }
     }
 
+    @Async("emailExecutor")
     public void sendBulkMeetingNotification(String[] bcc, String mentorName, String title, String time,
             String location) {
         SimpleMailMessage message = new SimpleMailMessage();
@@ -81,6 +93,7 @@ public class EmailService {
 
     // --- Leave Workflow Emails ---
 
+    @Async("emailExecutor")
     public void sendParentApprovalRequest(String parentEmail, String studentName, String leaveReason, String from,
             String to, String approvalLink, String otp) {
         String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>"
@@ -115,6 +128,7 @@ public class EmailService {
         sendHtmlEmail(parentEmail, "Leave Authorization Code for " + studentName, html);
     }
 
+    @Async("emailExecutor")
     public void sendStudentLeaveStatus(String studentEmail, String status, String comments) {
         String color = "APPROVED".equals(status) ? "#10b981" : "#ef4444";
         String html = "<html><body>"
@@ -128,6 +142,7 @@ public class EmailService {
         sendHtmlEmail(studentEmail, "Leave Request " + status, html);
     }
 
+    @Async("emailExecutor")
     public void sendActionOtp(String to, String otp, String actionDescription) {
         String html = "<!DOCTYPE html>"
                 + "<html>"
@@ -174,6 +189,7 @@ public class EmailService {
         sendHtmlEmail(to, "Verification OTP: " + otp, html);
     }
 
+    @Async("emailExecutor")
     public void sendParentOtpCode(String parentEmail, String studentName, String otp) {
         String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>"
                 + "<body style='font-family: sans-serif; background-color: #121212; margin: 0; padding: 0;'>"

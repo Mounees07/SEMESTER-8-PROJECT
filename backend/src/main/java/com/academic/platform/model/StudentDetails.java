@@ -2,12 +2,18 @@ package com.academic.platform.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "student_details")
+@Table(name = "student_details", indexes = {
+        // Scalability: Department is filtered in nearly every list query
+        @Index(name = "idx_sd_department", columnList = "department"),
+        @Index(name = "idx_sd_semester", columnList = "semester"),
+        @Index(name = "idx_sd_mentor", columnList = "mentor_id")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,6 +26,7 @@ public class StudentDetails {
     @OneToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     @com.fasterxml.jackson.annotation.JsonIgnore
+    @EqualsAndHashCode.Exclude
     private User user;
 
     @Column(length = 20)
@@ -319,5 +326,6 @@ public class StudentDetails {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "mentor_id")
+    @EqualsAndHashCode.Exclude
     private User mentor;
 }

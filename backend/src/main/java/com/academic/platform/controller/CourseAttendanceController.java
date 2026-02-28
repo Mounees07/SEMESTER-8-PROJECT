@@ -4,9 +4,11 @@ import com.academic.platform.model.CourseAttendance;
 import com.academic.platform.model.CourseAttendanceSession;
 import com.academic.platform.service.CourseAttendanceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -47,6 +49,13 @@ public class CourseAttendanceController {
     @GetMapping("/sessions/section/{sectionId}")
     public ResponseEntity<List<CourseAttendanceSession>> getSectionSessions(@PathVariable Long sectionId) {
         return ResponseEntity.ok(attendanceService.getSectionSessions(sectionId));
+    }
+
+    @GetMapping("/sessions/section/{sectionId}/by-date")
+    public ResponseEntity<List<CourseAttendanceSession>> getSessionsByDate(
+            @PathVariable Long sectionId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(attendanceService.getSessionsByDate(sectionId, date));
     }
 
     @GetMapping("/sessions/{sessionId}/attendances")

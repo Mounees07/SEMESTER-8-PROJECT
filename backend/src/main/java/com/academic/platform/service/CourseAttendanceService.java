@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Random;
@@ -150,6 +151,16 @@ public class CourseAttendanceService {
 
     public List<CourseAttendance> getStudentAttendanceForSection(Long sectionId, Long studentId) {
         return attendanceRepo.findBySessionSectionIdAndStudentId(sectionId, studentId);
+    }
+
+    public List<CourseAttendanceSession> getSessionsByDate(Long sectionId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.atTime(LocalTime.MAX);
+        return sessionRepo.findBySectionIdAndCreatedAtBetweenOrderByCreatedAtDesc(sectionId, start, end);
+    }
+
+    public List<CourseAttendance> getPresentStudentsForSession(Long sessionId) {
+        return attendanceRepo.findBySessionId(sessionId);
     }
 
     public CourseAttendanceSession saveBulkAttendance(Long sectionId, String facultyUid,

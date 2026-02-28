@@ -132,6 +132,23 @@ public class LeaveController {
         return ResponseEntity.ok("Test email sent to " + email);
     }
 
+    @GetMapping("/security/by-date")
+    public ResponseEntity<?> getLeavesByDate(@RequestParam String date) {
+        if (!isLeaveFeatureEnabled()) {
+            return ResponseEntity.status(403).body("Leave module disabled.");
+        }
+        java.time.LocalDate localDate = java.time.LocalDate.parse(date);
+        return ResponseEntity.ok(leaveService.getLeavesByDate(localDate));
+    }
+
+    @GetMapping("/security/search")
+    public ResponseEntity<?> searchLeaves(@RequestParam String query) {
+        if (!isLeaveFeatureEnabled()) {
+            return ResponseEntity.status(403).body("Leave module disabled.");
+        }
+        return ResponseEntity.ok(leaveService.searchLeavesByRollOrName(query));
+    }
+
     @GetMapping("/security/active/{rollNumber}")
     public ResponseEntity<?> getActiveLeaveForStudent(@PathVariable String rollNumber) {
         if (!isLeaveFeatureEnabled()) {

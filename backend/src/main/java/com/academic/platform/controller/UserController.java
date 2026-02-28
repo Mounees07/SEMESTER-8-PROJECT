@@ -91,6 +91,31 @@ public class UserController {
 
             User updates = mapperCopy.convertValue(updatesMap, User.class);
 
+            if (updates.getStudentDetails() == null) {
+                updates.setStudentDetails(new com.academic.platform.model.StudentDetails());
+            }
+            com.academic.platform.model.StudentDetails details = updates.getStudentDetails();
+
+            if (updatesMap.containsKey("rollNumber")) {
+                details.setRollNumber(updatesMap.get("rollNumber") != null ? String.valueOf(updatesMap.get("rollNumber")) : null);
+            }
+            if (updatesMap.containsKey("department")) {
+                details.setDepartment(updatesMap.get("department") != null ? String.valueOf(updatesMap.get("department")) : null);
+            }
+            if (updatesMap.containsKey("semester")) {
+                Object sem = updatesMap.get("semester");
+                if (sem != null) {
+                    try {
+                        details.setSemester(Integer.parseInt(String.valueOf(sem)));
+                    } catch (NumberFormatException ignored) {}
+                } else {
+                    details.setSemester(null);
+                }
+            }
+            if (updatesMap.containsKey("studentStatus")) {
+                details.setStudentStatus(updatesMap.get("studentStatus") != null ? String.valueOf(updatesMap.get("studentStatus")) : null);
+            }
+
             return ResponseEntity.ok(userService.updateUser(uid, updates));
         } catch (IllegalArgumentException e) {
             String msg = "Error updating user " + uid + " - Invalid Argument: " + e.getMessage();
