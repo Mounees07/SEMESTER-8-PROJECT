@@ -45,7 +45,7 @@ const LayoutNew = ({ children }) => {
 
             <main className="main-content" style={{
                 flex: 1,
-                marginLeft: '200px', /* Match Navbar left alignment */
+                marginLeft: '130px', /* Match Navbar left alignment */
                 paddingTop: '100px', /* Push content below fixed Navbar (80px + gap) */
                 display: 'flex',
                 flexDirection: 'column',

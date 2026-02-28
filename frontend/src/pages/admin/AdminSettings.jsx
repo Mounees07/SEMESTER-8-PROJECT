@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import './AdminSettings.css';
 import api from '../../utils/api';
+import { useSettings } from '../../context/SettingsContext';
 
 const AdminSettings = () => {
+    const { settings: liveSettings } = useSettings();
     const [settings, setSettings] = useState({
         siteName: 'AcaSync Platform',
         adminEmail: 'admin@acasync.edu',
@@ -28,19 +30,30 @@ const AdminSettings = () => {
         emailNotifications: true,
         defaultLanguage: 'English',
         sessionTimeout: '30',
-        // New settings for features, security, environment, and policies
+        // Features
         'feature.leave.enabled': true,
         'feature.result.enabled': true,
         'feature.messaging.enabled': true,
         'feature.analytics.enabled': true,
+        'feature.courseRegistration.enabled': true,
+        'feature.assignments.enabled': true,
+        'feature.finance.enabled': true,
+        'feature.examSeating.enabled': true,
+        // Security
         'security.captcha.enabled': false,
-        'env.debugMode': false,
-        'report.export.enabled': true,
-        'policy.password.minLength': 8,
         'security.login.maxAttempts': 5,
+        // Policies
         'policy.attendance.threshold': 75,
+        'policy.attendance.detain': 65,
+        'policy.leave.maxDays': 10,
         'policy.dataRetention': 365,
-        'env.label': 'Production'
+        'policy.password.minLength': 8,
+        'policy.password.complexity': 'strong',
+        // Reports
+        'report.export.enabled': true,
+        // Environment
+        'env.label': 'Production',
+        'env.debugMode': false,
     });
 
     const [activeTab, setActiveTab] = useState('general');
@@ -53,24 +66,53 @@ const AdminSettings = () => {
                 const response = await api.get('/admin/settings');
 
                 if (response.data) {
-                    const data = response.data;
+                    const d = response.data;
+
+                    // Helper – parse a backend string to boolean
+                    const bool = (key, fallback = true) =>
+                        d[key] !== undefined ? d[key] === 'true' : fallback;
+
+                    // Helper – parse to number, keep as number
+                    const num = (key, fallback) =>
+                        d[key] !== undefined ? Number(d[key]) : fallback;
+
                     setSettings(prev => ({
                         ...prev,
-                        ...data,
-                        maintenanceMode: data.maintenanceMode === 'true',
-                        allowRegistration: data.allowRegistration === 'true',
-                        emailNotifications: data.emailNotifications === 'true',
-                        'feature.leave.enabled': data['feature.leave.enabled'] === 'true',
-                        'feature.result.enabled': data['feature.result.enabled'] === 'true',
-                        'feature.messaging.enabled': data['feature.messaging.enabled'] === 'true',
-                        'feature.analytics.enabled': data['feature.analytics.enabled'] === 'true',
-                        'security.captcha.enabled': data['security.captcha.enabled'] === 'true',
-                        'env.debugMode': data['env.debugMode'] === 'true',
-                        'report.export.enabled': data['report.export.enabled'] === 'true'
+                        // String fields (keep as string)
+                        siteName: d.siteName ?? prev.siteName,
+                        adminEmail: d.adminEmail ?? prev.adminEmail,
+                        defaultLanguage: d.defaultLanguage ?? prev.defaultLanguage,
+                        sessionTimeout: d.sessionTimeout ?? prev.sessionTimeout,
+                        'env.label': d['env.label'] ?? prev['env.label'],
+                        'policy.password.complexity': d['policy.password.complexity'] ?? prev['policy.password.complexity'],
+
+                        // Boolean fields
+                        maintenanceMode: bool('maintenanceMode', false),
+                        allowRegistration: bool('allowRegistration', true),
+                        emailNotifications: bool('emailNotifications', true),
+                        'report.export.enabled': bool('report.export.enabled', true),
+                        'security.captcha.enabled': bool('security.captcha.enabled', false),
+                        'env.debugMode': bool('env.debugMode', false),
+                        'feature.leave.enabled': bool('feature.leave.enabled', true),
+                        'feature.result.enabled': bool('feature.result.enabled', true),
+                        'feature.messaging.enabled': bool('feature.messaging.enabled', true),
+                        'feature.analytics.enabled': bool('feature.analytics.enabled', true),
+                        'feature.courseRegistration.enabled': bool('feature.courseRegistration.enabled', true),
+                        'feature.assignments.enabled': bool('feature.assignments.enabled', true),
+                        'feature.finance.enabled': bool('feature.finance.enabled', true),
+                        'feature.examSeating.enabled': bool('feature.examSeating.enabled', true),
+
+                        // Number / mixed fields
+                        'policy.attendance.threshold': num('policy.attendance.threshold', 75),
+                        'policy.attendance.detain': num('policy.attendance.detain', 65),
+                        'policy.leave.maxDays': num('policy.leave.maxDays', 10),
+                        'policy.dataRetention': num('policy.dataRetention', 365),
+                        'policy.password.minLength': num('policy.password.minLength', 8),
+                        'security.login.maxAttempts': num('security.login.maxAttempts', 5),
                     }));
                 }
             } catch (error) {
-                console.error("Failed to fetch settings", error);
+                console.error('Failed to fetch settings', error);
             }
         };
         fetchSettings();
@@ -88,28 +130,43 @@ const AdminSettings = () => {
         setLoading(true);
         try {
             const payload = {
+                // preserve all string-valued settings as-is
                 ...settings,
+                // coerce booleans → 'true' / 'false'
                 maintenanceMode: String(settings.maintenanceMode),
                 allowRegistration: String(settings.allowRegistration),
                 emailNotifications: String(settings.emailNotifications),
+                'report.export.enabled': String(settings['report.export.enabled']),
+                'security.captcha.enabled': String(settings['security.captcha.enabled']),
+                'env.debugMode': String(settings['env.debugMode']),
                 'feature.leave.enabled': String(settings['feature.leave.enabled']),
                 'feature.result.enabled': String(settings['feature.result.enabled']),
                 'feature.messaging.enabled': String(settings['feature.messaging.enabled']),
                 'feature.analytics.enabled': String(settings['feature.analytics.enabled']),
-                'security.captcha.enabled': String(settings['security.captcha.enabled']),
-                'env.debugMode': String(settings['env.debugMode']),
-                'report.export.enabled': String(settings['report.export.enabled'])
+                'feature.courseRegistration.enabled': String(settings['feature.courseRegistration.enabled']),
+                'feature.assignments.enabled': String(settings['feature.assignments.enabled']),
+                'feature.finance.enabled': String(settings['feature.finance.enabled']),
+                'feature.examSeating.enabled': String(settings['feature.examSeating.enabled']),
+                // coerce numbers → string (backend stores everything as String)
+                'policy.attendance.threshold': String(settings['policy.attendance.threshold']),
+                'policy.attendance.detain': String(settings['policy.attendance.detain']),
+                'policy.leave.maxDays': String(settings['policy.leave.maxDays']),
+                'policy.dataRetention': String(settings['policy.dataRetention']),
+                'policy.password.minLength': String(settings['policy.password.minLength']),
+                'security.login.maxAttempts': String(settings['security.login.maxAttempts']),
             };
 
             const response = await api.post('/admin/settings', payload);
 
             if (response.status === 200) {
-                alert("Settings saved successfully!");
+                // Refresh public settings cache in the browser
+                try { await api.get('/admin/settings/public/features'); } catch (_) { }
+                alert('Settings saved successfully! Changes are now enforced across the platform.');
             }
         } catch (error) {
             console.error(error);
             const msg = error.response?.data?.message || error.message;
-            alert("Error saving settings: " + msg);
+            alert('Error saving settings: ' + msg);
         } finally {
             setLoading(false);
         }
@@ -117,14 +174,13 @@ const AdminSettings = () => {
 
     const ToggleSwitch = ({ name, checked, onChange }) => (
         <button
-            className="toggle-btn"
+            className={`toggle-pill ${checked ? 'toggle-pill--on' : ''}`}
+            role="switch"
+            aria-checked={checked}
             onClick={() => onChange({ target: { name, type: 'checkbox', checked: !checked } })}
+            title={checked ? 'Enabled — click to disable' : 'Disabled — click to enable'}
         >
-            {checked ? (
-                <ToggleRight size={44} color="#4D44B5" fill="#EBE9FE" />
-            ) : (
-                <ToggleLeft size={44} color="#A098AE" />
-            )}
+            <span className="toggle-pill__knob" />
         </button>
     );
 
@@ -262,15 +318,23 @@ const AdminSettings = () => {
                                 <div className="form-content">
                                     <div className="toggle-row">
                                         <div className="toggle-info">
-                                            <label>Email Notifications</label>
-                                            <p>Send system alerts and reports via email.</p>
+                                            <label>Email Notifications
+                                                {!settings.emailNotifications && (
+                                                    <span style={{ marginLeft: 8, fontSize: '0.7rem', padding: '2px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontWeight: 700 }}>DISABLED</span>
+                                                )}
+                                            </label>
+                                            <p>Send system alerts and reports via email.{!settings.emailNotifications && <strong style={{ color: '#ef4444' }}> Emails are currently blocked.</strong>}</p>
                                         </div>
                                         <ToggleSwitch name="emailNotifications" checked={settings.emailNotifications} onChange={handleChange} />
                                     </div>
                                     <div className="toggle-row">
                                         <div className="toggle-info">
-                                            <label>Export Features</label>
-                                            <p>Allow exporting reports to CSV/PDF.</p>
+                                            <label>Export Features
+                                                {!settings['report.export.enabled'] && (
+                                                    <span style={{ marginLeft: 8, fontSize: '0.7rem', padding: '2px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontWeight: 700 }}>DISABLED</span>
+                                                )}
+                                            </label>
+                                            <p>Allow exporting reports to CSV/PDF.{!settings['report.export.enabled'] && <strong style={{ color: '#ef4444' }}> Export buttons are currently hidden/disabled.</strong>}</p>
                                         </div>
                                         <ToggleSwitch name="report.export.enabled" checked={settings['report.export.enabled']} onChange={handleChange} />
                                     </div>
@@ -290,8 +354,12 @@ const AdminSettings = () => {
                                 <div className="form-content">
                                     <div className="toggle-row">
                                         <div className="toggle-info">
-                                            <label>Allow Registration</label>
-                                            <p>Enable public user signup pages.</p>
+                                            <label>Allow Registration
+                                                {!settings.allowRegistration && (
+                                                    <span style={{ marginLeft: 8, fontSize: '0.7rem', padding: '2px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontWeight: 700 }}>CLOSED</span>
+                                                )}
+                                            </label>
+                                            <p>Enable public user signup pages.{!settings.allowRegistration && <strong style={{ color: '#ef4444' }}> Login page will show a registration-disabled notice.</strong>}</p>
                                         </div>
                                         <ToggleSwitch name="allowRegistration" checked={settings.allowRegistration} onChange={handleChange} />
                                     </div>
@@ -354,60 +422,103 @@ const AdminSettings = () => {
 
                     {/* FEATURES TAB */}
                     {activeTab === 'features' && (
-                        <div className="section-grid animate-fade-in">
-                            <div>
-                                <div className="settings-section-header">
-                                    <Database size={24} color="#4D44B5" />
-                                    <h3>Module Management</h3>
-                                </div>
-                                <div className="feature-grid">
-                                    {[
-                                        { key: 'feature.leave.enabled', label: 'Leave Management', desc: 'Enable leave requests and approvals.' },
-                                        { key: 'feature.result.enabled', label: 'Results Module', desc: 'Enable student result publishing.' },
-                                        { key: 'feature.analytics.enabled', label: 'Analytics Dashboard', desc: 'Show advanced usage stats.' },
-                                        { key: 'feature.messaging.enabled', label: 'Messaging System', desc: 'Internal chat and announcements.' }
-                                    ].map(item => (
-                                        <div key={item.key} className="toggle-row">
-                                            <div className="toggle-info">
-                                                <label>{item.label}</label>
-                                                <p>{item.desc}</p>
-                                            </div>
-                                            <ToggleSwitch name={item.key} checked={settings[item.key]} onChange={handleChange} />
-                                        </div>
-                                    ))}
-                                </div>
+                        <div className="animate-fade-in">
+                            {/* Module Management */}
+                            <div className="settings-section-header" style={{ marginBottom: '20px' }}>
+                                <Database size={24} color="#7c6bdc" />
+                                <h3>Module Management</h3>
                             </div>
-                            <div>
-                                <div className="settings-section-header">
-                                    <AlertCircle size={24} color="#FB7D5B" />
-                                    <h3>Academic Policies</h3>
-                                </div>
-                                <div className="form-content">
-                                    <InputField
-                                        label="Attendance Threshold (%)"
-                                        name="policy.attendance.threshold"
-                                        type="number"
-                                        value={settings['policy.attendance.threshold'] || 75}
-                                        onChange={handleChange}
-                                        placeholder="75"
-                                        icon={Shield}
-                                    />
-                                    <InputField
-                                        label="Data Retention Period (Days)"
-                                        name="policy.dataRetention"
-                                        type="number"
-                                        value={settings['policy.dataRetention'] || 365}
-                                        onChange={handleChange}
-                                        placeholder="365"
-                                        icon={Clock}
-                                    />
-                                    <div className="alert-box">
-                                        <AlertCircle size={24} color="#FB7D5B" style={{ flexShrink: 0 }} />
-                                        <div className="alert-content">
-                                            <h4>Important Notice</h4>
-                                            <p>Changing data retention policies may permanently delete older records during the next nightly cleanup job. Please proceed with caution.</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '40px' }}>
+                                {[
+                                    { key: 'feature.leave.enabled', label: 'Leave Management', desc: 'Student leave requests & mentor approvals.', icon: '🏖️' },
+                                    { key: 'feature.result.enabled', label: 'Results Module', desc: 'COE publishes exam results for students.', icon: '📊' },
+                                    { key: 'feature.analytics.enabled', label: 'Analytics Dashboard', desc: 'HOD / Admin advanced usage stats.', icon: '📈' },
+                                    { key: 'feature.messaging.enabled', label: 'Messaging System', desc: 'Internal chat & broadcast announcements.', icon: '💬' },
+                                    { key: 'feature.courseRegistration.enabled', label: 'Course Registration', desc: 'Students self-select faculty per course.', icon: '📚' },
+                                    { key: 'feature.assignments.enabled', label: 'Assignment Submission', desc: 'Teachers post tasks & students submit.', icon: '📝' },
+                                    { key: 'feature.finance.enabled', label: 'Finance Module', desc: 'Fee records and payment tracking.', icon: '💰' },
+                                    { key: 'feature.examSeating.enabled', label: 'Exam Seating', desc: 'COE publishes seating chart for students.', icon: '🪑' },
+                                ].map(item => (
+                                    <div key={item.key} className="toggle-row">
+                                        <div className="toggle-info">
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>{item.icon}</span> {item.label}
+                                                {!settings[item.key] && (
+                                                    <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontWeight: 700 }}>OFF</span>
+                                                )}
+                                            </label>
+                                            <p>{item.desc}</p>
                                         </div>
+                                        <ToggleSwitch name={item.key} checked={!!settings[item.key]} onChange={handleChange} />
                                     </div>
+                                ))}
+                            </div>
+
+                            {/* Academic Policies */}
+                            <div className="settings-section-header" style={{ marginBottom: '20px' }}>
+                                <AlertCircle size={24} color="#FB7D5B" />
+                                <h3>Academic Policies</h3>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                                <InputField
+                                    label="Minimum Attendance Threshold (%)"
+                                    name="policy.attendance.threshold"
+                                    type="number"
+                                    value={settings['policy.attendance.threshold'] || 75}
+                                    onChange={handleChange}
+                                    placeholder="75"
+                                    icon={Shield}
+                                />
+                                <InputField
+                                    label="Detain Below Attendance (%)"
+                                    name="policy.attendance.detain"
+                                    type="number"
+                                    value={settings['policy.attendance.detain'] || 65}
+                                    onChange={handleChange}
+                                    placeholder="65"
+                                    icon={Shield}
+                                />
+                                <InputField
+                                    label="Max Leave Days Per Semester"
+                                    name="policy.leave.maxDays"
+                                    type="number"
+                                    value={settings['policy.leave.maxDays'] || 10}
+                                    onChange={handleChange}
+                                    placeholder="10"
+                                    icon={Clock}
+                                />
+                                <InputField
+                                    label="Data Retention Period (Days)"
+                                    name="policy.dataRetention"
+                                    type="number"
+                                    value={settings['policy.dataRetention'] || 365}
+                                    onChange={handleChange}
+                                    placeholder="365"
+                                    icon={Clock}
+                                />
+                                <InputField
+                                    label="Min Password Length"
+                                    name="policy.password.minLength"
+                                    type="number"
+                                    value={settings['policy.password.minLength'] || 8}
+                                    onChange={handleChange}
+                                    placeholder="8"
+                                    icon={Shield}
+                                />
+                                <SelectField
+                                    label="Password Strength"
+                                    name="policy.password.complexity"
+                                    value={settings['policy.password.complexity'] || 'strong'}
+                                    onChange={handleChange}
+                                    options={['basic', 'medium', 'strong']}
+                                />
+                            </div>
+
+                            <div className="alert-box">
+                                <AlertCircle size={24} color="#FB7D5B" style={{ flexShrink: 0 }} />
+                                <div className="alert-content">
+                                    <h4>Important Notice</h4>
+                                    <p>Toggling a module OFF immediately prevents students and faculty from accessing that page. Changing attendance or retention policies takes effect on the next scheduled report cycle.</p>
                                 </div>
                             </div>
                         </div>
@@ -417,11 +528,11 @@ const AdminSettings = () => {
                     {activeTab === 'env' && (
                         <div style={{ maxWidth: '800px', margin: '0 auto' }} className="animate-fade-in">
                             <div className="settings-section-header">
-                                <Server size={24} color="#4D44B5" />
+                                <Server size={24} color="#7c6bdc" />
                                 <h3>Environment Configuration</h3>
                             </div>
 
-                            <div style={{ backgroundColor: '#F9FAFB', borderRadius: '24px', padding: '32px', border: '1px solid #F5F5FA' }}>
+                            <div className="env-config-card">
                                 <SelectField
                                     label="Environment Label"
                                     name="env.label"
@@ -430,7 +541,7 @@ const AdminSettings = () => {
                                     options={['Development', 'Testing', 'Staging', 'Production']}
                                 />
 
-                                <div className="toggle-row" style={{ marginTop: '24px', backgroundColor: 'white' }}>
+                                <div className="toggle-row" style={{ marginTop: '24px' }}>
                                     <div className="toggle-info">
                                         <label>Debug Mode</label>
                                         <p>Enable verbose logging for system diagnostics.</p>
@@ -438,7 +549,7 @@ const AdminSettings = () => {
                                     <ToggleSwitch name="env.debugMode" checked={settings['env.debugMode']} onChange={handleChange} />
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', backgroundColor: '#F3F4FF', borderRadius: '12px', color: '#4D44B5', marginTop: '24px', fontSize: '0.9rem' }}>
+                                <div className="env-info-banner">
                                     <Server size={18} />
                                     <p>Current Server Version: <strong>v2.4.0-stable</strong> (Build 20240215)</p>
                                 </div>
@@ -449,12 +560,12 @@ const AdminSettings = () => {
                     {/* LOGS TAB */}
                     {activeTab === 'logs' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }} className="animate-fade-in">
-                            <div className="settings-header" style={{ marginBottom: '24px', borderBottom: '1px solid #F5F5FA', paddingBottom: '16px' }}>
+                            <div className="settings-header" style={{ marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <Activity size={24} color="#4D44B5" />
-                                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#303972', margin: 0 }}>System Audit Trail</h3>
+                                    <Activity size={24} color="#7c6bdc" />
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>System Audit Trail</h3>
                                 </div>
-                                <button style={{ border: 'none', background: 'none', color: '#4D44B5', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button style={{ border: 'none', background: 'none', color: '#7c6bdc', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
                                     <FileText size={16} />
                                     Export Logs
                                 </button>

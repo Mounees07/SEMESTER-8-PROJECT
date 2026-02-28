@@ -5,13 +5,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-deep);
-  color: var(--primary);
-  font-family: var(--font-heading);
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-deep, #0f172a);
+  color: var(--primary, #6366f1);
+  font-family: var(--font-heading, 'Inter', sans-serif);
   font-size: 1.5rem;
   font-weight: 700;
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 #root {
   width: 100%;
-}
+}

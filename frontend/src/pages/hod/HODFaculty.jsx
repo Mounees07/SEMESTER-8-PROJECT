@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Users,
-    Search,
-    Plus,
-    Mail,
-    ExternalLink,
-    Briefcase,
-    Shield,
-    X
-} from 'lucide-react';
+import { Search, Download, Users, GraduationCap, Plane, Briefcase, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import './HODFaculty.css';
@@ -16,225 +7,242 @@ import './HODFaculty.css';
 const HODFaculty = () => {
     const { userData } = useAuth();
     const [faculty, setFaculty] = useState([]);
+    const [stats, setStats] = useState({ totalFaculty: 0, onLeave: 0, openPositions: 0 });
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [showAddModal, setShowAddModal] = useState(false);
-
-    // New Faculty Form State
-    const [newFaculty, setNewFaculty] = useState({
-        fullName: '',
-        email: '',
-        role: 'TEACHER',
-        password: '',
-        department: '',
-        rollNumber: '' // Used as Employee ID for faculty
-    });
+    const [activeTab, setActiveTab] = useState('All Members');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6;
 
     useEffect(() => {
         if (userData?.department) {
-            setNewFaculty(prev => ({ ...prev, department: userData.department }));
             fetchFaculty();
         }
     }, [userData]);
 
     const fetchFaculty = async () => {
+        setLoading(true);
         try {
-            // Using the endpoint we found in UserController
-            const res = await api.get(`/users/faculty/department?department=${userData.department}`);
-            setFaculty(res.data);
+            const [facultyRes, statsRes] = await Promise.all([
+                api.get(`/users/faculty/department?department=${userData.department}`),
+                api.get(`/department/dashboard/${userData.department}`)
+            ]);
+            setFaculty(facultyRes.data);
+
+            // Dummy logic for open positions since we don't have a backend hiring module
+            setStats({
+                totalFaculty: facultyRes.data.length,
+                onLeave: statsRes.data.pendingLeaves || 0,
+                openPositions: 2 // Hardcoded as placeholder for hiring
+            });
         } catch (error) {
-            console.error("Failed to fetch faculty", error);
+            console.error("Failed to fetch faculty data", error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAddFaculty = async (e) => {
-        e.preventDefault();
-        try {
-            // Using create-user endpoint to register new faculty
-            await api.post('/users/create-user', newFaculty);
-            await fetchFaculty();
-            setShowAddModal(false);
-            setNewFaculty({
-                fullName: '',
-                email: '',
-                role: 'TEACHER',
-                password: '',
-                department: userData.department,
-                rollNumber: ''
-            });
-            alert('Faculty member added successfully!');
-        } catch (error) {
-            console.error("Failed to add faculty", error);
-            alert("Error adding faculty: " + (error.response?.data?.message || error.message));
-        }
+    const handleSearch = (e) => {
+        setSearchTerm(e.target.value);
+        setCurrentPage(1);
     };
 
-    const filteredFaculty = faculty.filter(f =>
-        f.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    // Filter by search and tab (dummy logic for tabs right now)
+    const filteredFaculty = faculty.filter(f => {
+        const matchesSearch = f.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            f.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        let matchesTab = true;
+        if (activeTab === 'Professors') matchesTab = f.role === 'HOD' || f.role === 'PROFESSOR';
+        if (activeTab === 'Assistant/Associate') matchesTab = f.role === 'TEACHER';
+        // Add more specific filtering if roles allow
+
+        return matchesSearch && matchesTab;
+    });
+
+    const totalPages = Math.ceil(filteredFaculty.length / itemsPerPage) || 1;
+    const paginatedFaculty = filteredFaculty.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
     );
 
+    const getStatusClass = (status) => {
+        if (status === 'Active') return 'status-active';
+        if (status === 'On Leave') return 'status-leave';
+        return 'status-sabbatical';
+    };
+
     return (
-        <div className="hod-faculty-container">
-            <header className="faculty-header">
-                <div className="header-content">
-                    <h1>Faculty Directory</h1>
-                    <p>Manage academic staff within the {userData?.department} department</p>
+        <div className="hod-faculty-container-new">
+
+            {/* Top Navigation Strip (Like Dashboard) */}
+            <header className="hod-top-nav-shared">
+                <div className="search-bar-container-shared">
+                    <Search size={18} className="search-icon-shared" />
+                    <input type="text" placeholder="Search students, faculty, or courses..." className="hod-search-input-shared" />
                 </div>
-                <div className="action-bar">
-                    <div className="search-bar-container">
-                        <Search className="search-icon" size={18} />
-                        <input
-                            type="text"
-                            className="search-input"
-                            placeholder="Search by name or email..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <button className="add-faculty-btn" onClick={() => setShowAddModal(true)}>
-                        <Plus size={18} /> Add Faculty
-                    </button>
+                <div className="nav-actions-shared">
+                    <button className="icon-btn-shared"><Users size={18} /></button>
                 </div>
             </header>
 
-            {loading ? (
-                <div className="flex justify-center py-20">
-                    <div className="animate-spin text-indigo-500"><Users size={48} /></div>
+            <div className="faculty-page-header">
+                <div>
+                    <h1>Faculty & Staff Directory</h1>
+                    <p>Manage department personnel, academic roles, and availability.</p>
                 </div>
-            ) : (
-                <div className="faculty-grid">
-                    {filteredFaculty.length > 0 ? (
-                        filteredFaculty.map(member => (
-                            <div key={member.id} className="faculty-card">
-                                <div className="faculty-avatar">
-                                    {member.profilePictureUrl ? (
-                                        <img src={member.profilePictureUrl} alt={member.fullName} className="w-full h-full object-cover rounded-2xl" />
-                                    ) : (
-                                        member.fullName?.charAt(0)
-                                    )}
-                                </div>
-                                <h3 className="faculty-name">{member.fullName}</h3>
-                                <span className="faculty-role">{member.role}</span>
+                <button className="export-csv-btn">
+                    <Download size={16} /> Export CSV
+                </button>
+            </div>
 
-                                <div className="faculty-details">
-                                    <div className="detail-row">
-                                        <span className="detail-label">Employee ID</span>
-                                        <span>{member.rollNumber || 'N/A'}</span>
-                                    </div>
-                                    <div className="detail-row">
-                                        <span className="detail-label">Status</span>
-                                        <span className="text-green-500 font-bold">Active</span>
-                                    </div>
-                                    <div className="detail-row">
-                                        <span className="detail-label">Joined</span>
-                                        <span>{new Date().getFullYear()}</span>
-                                    </div>
-                                </div>
-
-                                <div className="faculty-actions">
-                                    <button className="card-btn btn-view">
-                                        <ExternalLink size={16} className="mx-auto" />
-                                    </button>
-                                    <a href={`mailto:${member.email}`} className="card-btn btn-email block text-center pt-2">
-                                        Email
-                                    </a>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="empty-state">
-                            <Users size={64} style={{ opacity: 0.5 }} />
-                            <h3>No Faculty Found</h3>
-                            <p>Try adjusting your search or add a new faculty member.</p>
-                        </div>
-                    )}
+            <div className="faculty-stats-grid">
+                <div className="f-stat-card">
+                    <div className="f-stat-header">
+                        <span className="f-stat-label">Total Personnel</span>
+                        <Users size={18} className="f-stat-icon" />
+                    </div>
+                    <div className="f-stat-value">{stats.totalFaculty}</div>
+                    <div className="f-stat-trend neutral">All Registered Members</div>
                 </div>
-            )}
+                <div className="f-stat-card">
+                    <div className="f-stat-header">
+                        <span className="f-stat-label">Full-Time Faculty</span>
+                        <GraduationCap size={18} className="f-stat-icon" />
+                    </div>
+                    <div className="f-stat-value">{stats.totalFaculty}</div>
+                    <div className="f-stat-trend neutral">— No change</div>
+                </div>
+                <div className="f-stat-card">
+                    <div className="f-stat-header">
+                        <span className="f-stat-label">On Leave</span>
+                        <Plane size={18} className="f-stat-icon" />
+                    </div>
+                    <div className="f-stat-value">{stats.onLeave}</div>
+                    <div className="f-stat-trend text-muted">Pending leave requests</div>
+                </div>
+                <div className="f-stat-card">
+                    <div className="f-stat-header">
+                        <span className="f-stat-label">Open Positions</span>
+                        <Briefcase size={18} className="f-stat-icon" />
+                    </div>
+                    <div className="f-stat-value">{stats.openPositions}</div>
+                    <div className="f-stat-trend positive">↗ Actively interviewing</div>
+                </div>
+            </div>
 
-            {/* Add Faculty Modal */}
-            {showAddModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <button className="modal-close" onClick={() => setShowAddModal(false)}>
-                            <X size={20} />
-                        </button>
-                        <h2 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-                            <Briefcase className="text-indigo-500" />
-                            Onboard New Faculty
-                        </h2>
-
-                        <form onSubmit={handleAddFaculty}>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="form-group">
-                                    <label className="form-label">Full Name</label>
-                                    <input
-                                        required
-                                        className="form-input"
-                                        value={newFaculty.fullName}
-                                        onChange={e => setNewFaculty({ ...newFaculty, fullName: e.target.value })}
-                                        placeholder="Dr. John Doe"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Role</label>
-                                    <select
-                                        className="form-input"
-                                        value={newFaculty.role}
-                                        onChange={e => setNewFaculty({ ...newFaculty, role: e.target.value })}
-                                    >
-                                        <option value="TEACHER">TEACHER</option>
-                                        <option value="MENTOR">MENTOR</option>
-                                        <option value="HOD">HOD</option>
-                                        <option value="COE">COE</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Email Address</label>
-                                <input
-                                    required
-                                    type="email"
-                                    className="form-input"
-                                    value={newFaculty.email}
-                                    onChange={e => setNewFaculty({ ...newFaculty, email: e.target.value })}
-                                    placeholder="faculty@college.edu"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Employee ID</label>
-                                <input
-                                    required
-                                    className="form-input"
-                                    value={newFaculty.rollNumber}
-                                    onChange={e => setNewFaculty({ ...newFaculty, rollNumber: e.target.value })}
-                                    placeholder="EMP-001"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Default Password</label>
-                                <input
-                                    required
-                                    type="password"
-                                    className="form-input"
-                                    value={newFaculty.password}
-                                    onChange={e => setNewFaculty({ ...newFaculty, password: e.target.value })}
-                                    placeholder="Create a secure password"
-                                />
-                            </div>
-
-                            <button type="submit" className="submit-btn">
-                                Create Account
+            <div className="faculty-directory-card">
+                <div className="directory-toolbar">
+                    <div className="directory-tabs">
+                        {['All Members', 'Professors', 'Assistant/Associate', 'Adjunct', 'Staff'].map(tab => (
+                            <button
+                                key={tab}
+                                className={`dir-tab ${activeTab === tab ? 'active' : ''}`}
+                                onClick={() => setActiveTab(tab)}
+                            >
+                                {tab}
                             </button>
-                        </form>
+                        ))}
+                    </div>
+                    <div className="directory-search">
+                        <Search size={16} className="dir-search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search directory..."
+                            value={searchTerm}
+                            onChange={handleSearch}
+                        />
                     </div>
                 </div>
-            )}
+
+                <div className="directory-table-wrapper">
+                    <table className="directory-table">
+                        <thead>
+                            <tr>
+                                <th>Personnel</th>
+                                <th>Specialization</th>
+                                <th>Contact</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan="5" className="text-center p-4 text-muted">Loading Directory...</td></tr>
+                            ) : paginatedFaculty.length > 0 ? (
+                                paginatedFaculty.map((member, idx) => {
+                                    const roleStr = member.role === 'HOD' ? 'Head of Department' : member.role === 'PROFESSOR' ? 'Professor' : 'Assistant Professor';
+                                    const status = 'Active'; // Default since DB doesn't track live presence right now
+                                    const specStr = member.department ? member.department + ' Dept' : 'General Faculty';
+                                    const phoneStr = member.mobileNumber || 'No Phone Provided';
+
+                                    return (
+                                        <tr key={member.id || idx}>
+                                            <td>
+                                                <div className="personnel-cell">
+                                                    <div className="personnel-avatar">
+                                                        {member.profilePictureUrl ? (
+                                                            <img src={member.profilePictureUrl} alt="" />
+                                                        ) : (
+                                                            <span>{member.fullName?.substring(0, 2).toUpperCase() || 'FA'}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="personnel-info">
+                                                        <span className="personnel-name">{member.fullName}</span>
+                                                        <span className="personnel-role">{roleStr}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="specialization-cell">{specStr}</td>
+                                            <td>
+                                                <div className="contact-cell">
+                                                    <span className="contact-email">{member.email}</span>
+                                                    <span className="contact-room">{phoneStr}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span className={`status-badge ${getStatusClass(status)}`}>
+                                                    {status}
+                                                </span>
+                                            </td>
+                                            <td className="action-cell-right">
+                                                <button className="more-btn">
+                                                    <MoreVertical size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr><td colSpan="5" className="text-center p-4 text-muted">No members found.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="directory-footer">
+                    <div className="showing-info">
+                        Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredFaculty.length)} to {Math.min(currentPage * itemsPerPage, filteredFaculty.length)} of {filteredFaculty.length} entries
+                    </div>
+                    <div className="pagination-controls">
+                        <button
+                            className="page-nav-btn"
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(p => p - 1)}
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <button
+                            className="page-nav-btn"
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(p => p + 1)}
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 };

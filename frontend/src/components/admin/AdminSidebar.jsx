@@ -32,7 +32,7 @@ const AdminSidebar = () => {
 
     const menuItems = [
         { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { to: '/admin/teachers', icon: GraduationCap, label: 'Teachers' },
+        { to: '/admin/users', icon: Users, label: 'User Management' },
         { to: '/admin/students', icon: Users, label: 'Students' },
         { to: '/admin/attendance', icon: UserCheck, label: 'Attendance' },
         { to: '/admin/finance', icon: DollarSign, label: 'Finance' },

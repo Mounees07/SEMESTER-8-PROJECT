@@ -22,7 +22,7 @@ export const ThemeProvider = ({ children }) => {
             if (newResolvedTheme === 'light') {
                 root.setAttribute('data-theme', 'light');
             } else {
-                root.removeAttribute('data-theme'); // default is dark
+                root.setAttribute('data-theme', 'dark');
             }
         };
 

@@ -1,28 +1,19 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Phone,
-    Loader,
-    BookOpen,
-    ClipboardList,
-    Award,
-    FileText,
-    Users
+    Loader
 } from 'lucide-react';
 import {
     BarChart,
     Bar,
-    XAxis,
     YAxis,
-    ResponsiveContainer,
     Cell,
     Tooltip,
-    LabelList
 } from 'recharts';
 import './DashboardOverview.css';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { calculateAttendance } from '../utils/attendanceUtils';
 
 
 
@@ -34,35 +25,49 @@ const DashboardOverview = () => {
     const [loading, setLoading] = useState(true);
     const [dashboardStats, setDashboardStats] = useState({
         cgpa: "0.00",
+        sgpa: "0.00",
         attendance: "0",
         activeCourses: "0",
         pendingAssignments: "0",
         placementStatus: "Not Evaluated"
     });
 
-    const [activeTab, setActiveTab] = useState('Personal');
     const [selectedSem, setSelectedSem] = useState(1);
+
 
     useEffect(() => {
         const fetchData = async () => {
             if (!currentUser) return;
             try {
-                const userRes = await api.get(`/users/${currentUser.uid}`);
+                // ── Scalability fix: Fire all independent requests in parallel ──────────
+                // Previously these 6 calls were sequential; now they all start at once.
+                const [
+                    userRes,
+                    attRes,
+                    enrollRes,
+                    subsRes,
+                    sgpaRes,
+                    leaveRes,
+                    feesRes,
+                ] = await Promise.all([
+                    api.get(`/users/${currentUser.uid}`),
+                    api.get(`/attendance/student/${currentUser.uid}`),
+                    api.get(`/courses/enrollments/student/${currentUser.uid}`),
+                    api.get(`/assignments/student/${currentUser.uid}`).catch(() => ({ data: [] })),
+                    api.get(`/results/student/${currentUser.uid}/sgpa-history`).catch(() => ({ data: [] })),
+                    api.get(`/leaves/student/${currentUser.uid}`).catch(() => ({ data: [] })),
+                    api.get(`/finance/fees/student/${currentUser.uid}`).catch(() => ({ data: [] })),
+                ]);
+
                 setStudentProfile(userRes.data);
                 setSelectedSem(userRes.data.semester || 1);
 
-                // Fetch Attendance
-                const attRes = await api.get(`/attendance/student/${currentUser.uid}`);
-                const attStatsRes = await api.get(`/attendance/stats/${currentUser.uid}`).catch(() => ({ data: { percentage: 0 } }));
+                // Real Attendance Calculation
+                const { percentage: realPercentage } = calculateAttendance(attRes.data);
 
-                // Fetch Enrollments & Submissions
-                const enrollRes = await api.get(`/courses/enrollments/student/${currentUser.uid}`);
                 const enrollments = enrollRes.data || [];
 
-                const subsRes = await api.get(`/assignments/student/${currentUser.uid}`).catch(() => ({ data: [] }));
-
-                // Fetch SGPA History
-                const sgpaRes = await api.get(`/results/student/${currentUser.uid}/sgpa-history`).catch(() => ({ data: [] }));
+                // SGPA History
                 const history = sgpaRes.data || [];
                 setSgpaHistory(history);
 
@@ -76,7 +81,6 @@ const DashboardOverview = () => {
                 // --- Process Recent Activity ---
                 const activities = [];
 
-                // 1. Add Attendance
                 attRes.data.forEach(att => {
                     activities.push({
                         type: 'attendance',
@@ -86,7 +90,6 @@ const DashboardOverview = () => {
                     });
                 });
 
-                // 2. Add Submissions
                 subsRes.data.forEach(sub => {
                     activities.push({
                         type: 'submission',
@@ -96,31 +99,26 @@ const DashboardOverview = () => {
                     });
                 });
 
-                // Sort: Newest First
                 const sortedActivities = activities
                     .sort((a, b) => b.timestamp - a.timestamp)
-                    .slice(0, 5); // Take top 5
+                    .slice(0, 5);
 
                 setRecentActivity(sortedActivities);
-                // -------------------------------
 
-                let pendingCount = 0;
+                // ── Fetch section assignments in parallel ─────────────────────────────
                 const assignmentPromises = enrollments.map(e =>
                     api.get(`/assignments/section/${e.section.id}`).then(res => res.data).catch(() => [])
                 );
                 const allSectionAssignments = (await Promise.all(assignmentPromises)).flat();
 
                 const submissionIds = new Set(subsRes.data.map(s => s.assignment.id));
+                const pendingCount = allSectionAssignments.filter(a => !submissionIds.has(a.id)).length;
 
-                pendingCount = allSectionAssignments.filter(a => !submissionIds.has(a.id)).length;
-
-                // Fetch Leave Requests (for balance/status)
-                const leaveRes = await api.get(`/leaves/student/${currentUser.uid}`).catch(() => ({ data: [] }));
+                // Leave balance
                 const approvedLeaves = leaveRes.data ? leaveRes.data.filter(l => l.status === 'APPROVED').length : 0;
-                const totalLeaves = 10; // Assuming total leaves allowed is 10
+                const totalLeaves = 10;
                 const leaveBalance = totalLeaves - approvedLeaves;
 
-                // Determine placement status based on semantic criteria
                 let placement = "Not Evaluated";
                 if (userRes.data.placementStatus) {
                     placement = userRes.data.placementStatus;
@@ -128,21 +126,26 @@ const DashboardOverview = () => {
                     placement = "Eligible";
                 }
 
+                // Calculate real fees due from Finance module
+                const feeRecords = feesRes.data || [];
+                const realFeesDue = feeRecords.reduce((sum, fee) => {
+                    if (fee.paymentStatus === 'Pending' || fee.paymentStatus === 'Overdue') {
+                        return sum + (fee.totalAmount || 0);
+                    }
+                    return sum;
+                }, 0);
+
                 setDashboardStats({
                     cgpa: userRes.data.cgpa ? Number(userRes.data.cgpa).toFixed(2) : (userRes.data.gpa ? Number(userRes.data.gpa).toFixed(2) : "N/A"),
                     sgpa: currentSgpa,
-                    attendance: attStatsRes.data.percentage !== undefined ? attStatsRes.data.percentage : "0",
+                    attendance: realPercentage.toString(),
                     activeCourses: enrollments.length.toString(),
                     pendingAssignments: pendingCount.toString(),
                     arrearCount: userRes.data.arrearCount || 0,
-                    feesDue: userRes.data.feesDue || 0,
+                    feesDue: realFeesDue,
                     placementStatus: placement
                 });
 
-                if (enrollments.length === 0) {
-                    // Auto-seeding disabled per user request
-                    // try { await api.post(`/seed/lms?studentUid=${currentUser.uid}`); } catch (e) { }
-                }
             } catch (err) {
                 console.error("Error fetching dashboard data:", err);
             } finally {
@@ -424,75 +427,8 @@ const DashboardOverview = () => {
             {/* RIGHT COLUMN - Sidebar (Now Information Column) */}
             <div className="dashboard-sidebar-col">
 
-                {/* 1. Academic Journey (Simplified Dropdown with Profile) */}
 
 
-                {/* 2. Navigation Tabs */}
-                <div className="dash-tabs vertical">
-                    {['Education', 'Experience', 'Documents'].map(tab => (
-                        <button
-                            key={tab}
-                            className={`dash-tab-btn ${activeTab === tab ? 'active' : ''}`}
-                            onClick={() => setActiveTab(tab)}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </div>
-
-                {/* 2. Detailed Information Content */}
-
-
-                {activeTab === 'Education' && (
-                    <div className="dash-card info-card animate-fade-in-up">
-                        <div className="card-header-row">
-                            <h3><span className="icon-user">🎓</span> Education</h3>
-                        </div>
-                        <div className="education-list">
-                            <div className="edu-item" style={{ padding: '15px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <h4 style={{ color: 'white', marginBottom: '5px', fontSize: '0.95rem' }}>Higher Secondary</h4>
-                                <p style={{ color: '#94a3b8', fontSize: '0.85em' }}>State Board • 2021</p>
-                                <p style={{ color: '#10b981', fontSize: '0.85em', fontWeight: 'bold' }}>94.5% Aggregate</p>
-                            </div>
-                            <div className="edu-item" style={{ padding: '15px 0' }}>
-                                <h4 style={{ color: 'white', marginBottom: '5px', fontSize: '0.95rem' }}>Secondary School</h4>
-                                <p style={{ color: '#94a3b8', fontSize: '0.85em' }}>State Board • 2019</p>
-                                <p style={{ color: '#10b981', fontSize: '0.85em', fontWeight: 'bold' }}>98.2% Aggregate</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'Experience' && (
-                    <div className="dash-card info-card animate-fade-in-up">
-                        <div className="card-header-row">
-                            <h3><span className="icon-user">💼</span> Experience</h3>
-                        </div>
-                        <div className="xp-list" style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                            <p>No internships added yet.</p>
-                            <button className="btn-edit" style={{ marginTop: '10px' }}>Add Experience</button>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'Documents' && (
-                    <div className="dash-card info-card animate-fade-in-up">
-                        <div className="card-header-row">
-                            <h3><span className="icon-user">📂</span> Documents</h3>
-                        </div>
-                        <div className="documents-grid-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
-                            {['MarkSheet_Sem1.pdf', 'MarkSheet_Sem2.pdf', 'Bonafide_Cert.pdf'].map((doc, idx) => (
-                                <div key={idx} className="doc-item-sidebar" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                    <div style={{ color: '#3b82f6' }}>
-                                        📄
-                                    </div>
-                                    <span style={{ fontSize: '0.85em', color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc}</span>
-                                    <button style={{ fontSize: '0.75em', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer' }}>⬇</button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
 
                 {/* 2. Recent Activity & Biometric Log */}
                 <div className="dash-card activity-card" style={{ marginTop: '20px' }}>

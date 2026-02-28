@@ -18,7 +18,7 @@ const StudentAcademic = () => {
                 <div style={{ marginTop: '30px', marginBottom: '30px' }}>
                     <div className="quick-access-grid">
                         <button className="quick-btn" onClick={() => navigate('/student/courses')}>
-                            <div className="qb-icon color-1"><BookOpen size={24} /></div>
+                            <div className="qb-icon color-1"><BookOpen size={30} /></div>
                             <span>My Courses</span>
                         </button>
                         <button className="quick-btn" onClick={() => navigate('/student/course-registration')}>
@@ -26,16 +26,16 @@ const StudentAcademic = () => {
                             <span>Choose Faculty</span>
                         </button>
                         <button className="quick-btn" onClick={() => navigate('/student/assignments')}>
-                            <div className="qb-icon color-3"><ClipboardList size={24} /></div>
+                            <div className="qb-icon color-3"><ClipboardList size={30} /></div>
                             <span>Assignments</span>
                         </button>
                         <button className="quick-btn" onClick={() => navigate('/student/results')}>
-                            <div className="qb-icon color-4"><Award size={24} /></div>
+                            <div className="qb-icon color-4"><Award size={30} /></div>
                             <span>Result</span>
                         </button>
                         <button className="quick-btn" onClick={() => navigate('/student/exam-seating')}>
-                            <div className="qb-icon color-5"><FileText size={24} /></div>
-                            <span>Hall Ticket</span>
+                            <div className="qb-icon color-5"><FileText size={30} /></div>
+                            <span>Exam Seating</span>
                         </button>
                     </div>
                 </div>

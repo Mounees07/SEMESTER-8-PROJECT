@@ -6,9 +6,9 @@
     align-items: center;
     position: fixed;
     top: 0;
-    left: 200px;
-    /* Increased from 140px to clear "AcaSync" logo text */
-    width: calc(100% - 200px);
+    left: 130px;
+    /* Adjusted from 200px to fix padding */
+    width: calc(100% - 130px);
     z-index: 40;
     background-color: transparent;
     backdrop-filter: none;
@@ -36,10 +36,60 @@
 .navbar-title {
     display: flex;
     align-items: center;
+    gap: 12px;
     font-size: 1.25rem;
     font-weight: 800;
     color: var(--text-primary);
     letter-spacing: -0.5px;
+}
+
+.nav-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-back-btn:hover {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+    transform: translateX(-2px);
+    border-color: var(--primary);
+}
+
+/* Floating back button — centred inside the sidebar column (left:24px, width:80px → centre ≈ 64px, minus 22px half-button = 42px) */
+.nav-back-floating {
+    position: fixed;
+    bottom: 32px;
+    left: 42px;
+    z-index: 200;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1.5px solid var(--glass-border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    transition: all 0.22s ease;
+}
+
+.nav-back-floating:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    transform: scale(1.12);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
 }
 
 /* Search Bar - Theme Aware Glass Style */
@@ -417,6 +467,6 @@
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: none;
     }
 }

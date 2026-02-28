@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Search, User, LogOut, Sun, Moon, Monitor, Settings, MessageCircle } from 'lucide-react';
+import { Bell, Search, User, LogOut, Sun, Moon, Monitor, Settings, MessageCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -82,145 +82,167 @@ const Navbar = () => {
 
     const currentTitle = getPageTitle(location.pathname);
 
+    // Determine home route based on role — direct navigation avoids browser history reload
+    const getRoleHome = () => {
+        switch (userData?.role) {
+            case 'ADMIN': return '/admin/dashboard';
+            default: return '/dashboard';
+        }
+    };
+
+    const isHomePage = location.pathname === getRoleHome() ||
+        (userData?.role !== 'ADMIN' && location.pathname === '/dashboard') ||
+        (userData?.role === 'ADMIN' && location.pathname === '/admin/dashboard');
+
     return (
-        <nav className="navbar">
-            <div className="navbar-title">
-            </div>
+        <>
+            {/* Floating Back Button — visible on all non-home pages, anchored above sidebar */}
+            {!isHomePage && (
+                <button
+                    className="nav-back-floating"
+                    onClick={() => navigate(getRoleHome())}
+                    title="Return to Dashboard"
+                >
+                    <ArrowLeft size={18} />
+                </button>
+            )}
 
-            <div className="nav-actions">
-                <div className="search-bar">
-                    <Search size={18} className="search-icon" />
-                    <input type="text" placeholder="Search..." />
+            <nav className="navbar">
+                <div className="navbar-title">
                 </div>
 
-                <div className="theme-wrapper" ref={themeMenuRef}>
-                    <button
-                        className="icon-btn theme-toggle-btn"
-                        onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
-                        title="Change Theme"
-                    >
-                        {getThemeIcon()}
-                    </button>
+                <div className="nav-actions">
 
-                    {isThemeMenuOpen && (
-                        <div className="theme-menu animate-fade-in">
-                            <button
-                                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
-                                onClick={() => { setTheme('light'); setIsThemeMenuOpen(false); }}
-                            >
-                                <Sun size={16} />
-                                <span>Light</span>
-                            </button>
-                            <button
-                                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
-                                onClick={() => { setTheme('dark'); setIsThemeMenuOpen(false); }}
-                            >
-                                <Moon size={16} />
-                                <span>Dark</span>
-                            </button>
-                            <button
-                                className={`theme-option ${theme === 'system' ? 'active' : ''}`}
-                                onClick={() => { setTheme('system'); setIsThemeMenuOpen(false); }}
-                            >
-                                <Monitor size={16} />
-                                <span>System</span>
-                            </button>
-                        </div>
-                    )}
-                </div>
+                    <div className="theme-wrapper" ref={themeMenuRef}>
+                        <button
+                            className="icon-btn theme-toggle-btn"
+                            onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+                            title="Change Theme"
+                        >
+                            {getThemeIcon()}
+                        </button>
 
-                <button className="icon-btn">
-                    <MessageCircle size={20} />
-                </button>
-
-                <button className="icon-btn">
-                    <Bell size={20} />
-                    <span className="notification-dot"></span>
-                </button>
-
-                <button className="icon-btn" onClick={handleLogout} title="Logout">
-                    <LogOut size={20} />
-                </button>
-
-                <div className="user-profile-wrapper" ref={profileMenuRef}>
-                    <div
-                        className="user-profile"
-                        onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                        role="button"
-                        tabIndex={0}
-                    >
-                        <div className="user-info">
-                            <span className="user-name">{userData?.fullName || 'User'}</span>
-                            <span className="user-role">{userData?.role || 'STUDENT'}</span>
-                        </div>
-                        <div className="avatar">
-                            {userData?.profilePictureUrl ? (
-                                <img src={userData.profilePictureUrl} alt="avatar" />
-                            ) : (
-                                <User size={20} />
-                            )}
-                        </div>
+                        {isThemeMenuOpen && (
+                            <div className="theme-menu animate-fade-in">
+                                <button
+                                    className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+                                    onClick={() => { setTheme('light'); setIsThemeMenuOpen(false); }}
+                                >
+                                    <Sun size={16} />
+                                    <span>Light</span>
+                                </button>
+                                <button
+                                    className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+                                    onClick={() => { setTheme('dark'); setIsThemeMenuOpen(false); }}
+                                >
+                                    <Moon size={16} />
+                                    <span>Dark</span>
+                                </button>
+                                <button
+                                    className={`theme-option ${theme === 'system' ? 'active' : ''}`}
+                                    onClick={() => { setTheme('system'); setIsThemeMenuOpen(false); }}
+                                >
+                                    <Monitor size={16} />
+                                    <span>System</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    {isProfileMenuOpen && (
-                        <div className="profile-dropdown animate-fade-in">
-                            <div className="dropdown-header">
-                                <div className="dropdown-user-details">
-                                    <span className="dd-name">{userData?.fullName || 'User Name'}</span>
-                                    <span className="dd-email">{userData?.email || 'user@example.com'}</span>
-                                    <span className="dd-role">
-                                        {userData?.department && `  ${userData.department}`}
-                                        {userData?.rollNumber && ` • ${userData.rollNumber}`}
-                                    </span>
-                                </div>
+                    <button className="icon-btn">
+                        <MessageCircle size={20} />
+                    </button>
+
+                    <button className="icon-btn">
+                        <Bell size={20} />
+                        <span className="notification-dot"></span>
+                    </button>
+
+                    <button className="icon-btn" onClick={handleLogout} title="Logout">
+                        <LogOut size={20} />
+                    </button>
+
+                    <div className="user-profile-wrapper" ref={profileMenuRef}>
+                        <div
+                            className="user-profile"
+                            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                            role="button"
+                            tabIndex={0}
+                        >
+                            <div className="user-info">
+                                <span className="user-name">{userData?.fullName || 'User'}</span>
+                                <span className="user-role">{userData?.role || 'STUDENT'}</span>
                             </div>
+                            <div className="avatar">
+                                {userData?.profilePictureUrl ? (
+                                    <img src={userData.profilePictureUrl} alt="avatar" />
+                                ) : (
+                                    <User size={20} />
+                                )}
+                            </div>
+                        </div>
 
-                            {userData?.role === 'STUDENT' && (
-                                <div className="dropdown-journey-section" style={{ padding: '12px', borderBottom: '1px solid var(--glass-border)' }}>
-                                    <div style={{ marginBottom: '8px', fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                        Current Semester
-                                    </div>
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        fontSize: '0.9rem',
-                                        fontWeight: '600',
-                                        color: 'var(--text-primary)'
-                                    }}>
-                                        <span style={{
-                                            background: 'rgba(59, 130, 246, 0.1)',
-                                            color: '#3b82f6',
-                                            padding: '4px 10px',
-                                            borderRadius: '6px',
-                                            fontSize: '0.85rem'
-                                        }}>
-                                            Semester {toRoman(userData?.semester || 1)}
-                                        </span>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                                            In Progress
+                        {isProfileMenuOpen && (
+                            <div className="profile-dropdown animate-fade-in">
+                                <div className="dropdown-header">
+                                    <div className="dropdown-user-details">
+                                        <span className="dd-name">{userData?.fullName || 'User Name'}</span>
+                                        <span className="dd-email">{userData?.email || 'user@example.com'}</span>
+                                        <span className="dd-role">
+                                            {userData?.department && `  ${userData.department}`}
+                                            {userData?.rollNumber && ` • ${userData.rollNumber}`}
                                         </span>
                                     </div>
                                 </div>
-                            )}
+
+                                {userData?.role === 'STUDENT' && (
+                                    <div className="dropdown-journey-section" style={{ padding: '12px', borderBottom: '1px solid var(--glass-border)' }}>
+                                        <div style={{ marginBottom: '8px', fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                            Current Semester
+                                        </div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            fontSize: '0.9rem',
+                                            fontWeight: '600',
+                                            color: 'var(--text-primary)'
+                                        }}>
+                                            <span style={{
+                                                background: 'rgba(59, 130, 246, 0.1)',
+                                                color: '#3b82f6',
+                                                padding: '4px 10px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.85rem'
+                                            }}>
+                                                Semester {toRoman(userData?.semester || 1)}
+                                            </span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                In Progress
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
 
 
-                            <button className="dropdown-item" onClick={() => navigate('/my-profile')}>
-                                <User size={16} />
-                                <span>My Profile</span>
-                            </button>
+                                {userData?.role === 'STUDENT' && (
+                                    <button className="dropdown-item" onClick={() => navigate('/my-profile')}>
+                                        <User size={16} />
+                                        <span>My Profile</span>
+                                    </button>
+                                )}
 
-                            <button className="dropdown-item danger" onClick={handleLogout}>
-                                <LogOut size={16} />
-                                <span>Logout</span>
-                            </button>
-                        </div>
-                    )}
+                                <button className="dropdown-item danger" onClick={handleLogout}>
+                                    <LogOut size={16} />
+                                    <span>Logout</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </nav>
+            </nav>
+        </>
     );
 };
 
 export default Navbar;
-

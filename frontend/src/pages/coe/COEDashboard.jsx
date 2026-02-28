@@ -3,16 +3,19 @@ import {
     Calendar,
     FileText,
     Users,
+    UserCheck,
     AlertTriangle,
     CheckCircle,
     Clock,
     Search,
-    BarChart2
+    BarChart2,
+    Building
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom'; // Added for navigation
+import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import '../../pages/DashboardOverview.css'; // Reusing the main dashboard styles
+import '../../pages/DashboardOverview.css';
+import './COEDashboard.css';
 
 const COEDashboard = () => {
     const { currentUser, userData } = useAuth();
@@ -163,8 +166,8 @@ const COEDashboard = () => {
     const stats = [
         { label: 'Upcoming Exams', value: statsData.exams.toString(), icon: Calendar, color: '#4f46e5' },
         { label: 'Total Faculty', value: statsData.faculty.toString(), icon: Users, color: '#f59e0b' },
-        { label: 'Active Students', value: statsData.students.toString(), icon: Users, color: '#10b981' },
-        { label: 'Departments', value: statsData.departments.toString(), icon: FileText, color: '#ef4444' }
+        { label: 'Active Students', value: statsData.students.toString(), icon: UserCheck, color: '#10b981' },
+        { label: 'Departments', value: statsData.departments.toString(), icon: Building, color: '#ef4444' }
     ];
 
     // removed static recentActivities array provided by backend logic now
@@ -185,34 +188,32 @@ const COEDashboard = () => {
             <div className="dashboard-main-col">
                 <header className="page-header mb-6">
                     <div className="header-greeting">
-                        <h1>Controller of Examinations</h1>
-                        <p>Welcome back, {userData?.fullName || 'Admin'}. Here is the exam overview.</p>
+                        <h1 style={{ fontWeight: 800 }}>Controller of Examinations</h1>
+                        <p style={{ color: 'var(--text-muted)' }}>Welcome back, {userData?.fullName || 'COE'}. Here is the exam overview.</p>
                     </div>
                 </header>
 
                 {/* 1. Stats Grid */}
-                <div className="stats-grid-row">
+                <div className="coe-stats-grid">
                     {stats.map((stat, idx) => (
-                        <div key={idx} className="dash-card stat-card-flex">
-                            <div className="stat-icon-bg" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                                <stat.icon size={24} />
+                        <div key={idx} className="coe-stat-card" style={{ borderTopColor: stat.color }}>
+                            <div className="coe-stat-header">
+                                <stat.icon size={16} color={stat.color} />
+                                <span>{stat.label}</span>
                             </div>
-                            <div className="stat-info">
-                                <span className="stat-label">{stat.label}</span>
-                                <h3 className="stat-value">{stat.value}</h3>
-                            </div>
+                            <div className="coe-stat-value">{stat.value}</div>
                         </div>
                     ))}
                 </div>
 
                 {/* 2. Upcoming Exams Section */}
-                <div className="dash-card">
-                    <div className="card-header-row">
+                <div className="coe-dash-card">
+                    <div className="coe-card-header">
                         <h3>Upcoming Examinations</h3>
-                        <button className="btn-link">View All</button>
+                        <button className="coe-view-all">View All</button>
                     </div>
                     <div className="table-responsive">
-                        <table className="clean-table">
+                        <table className="coe-table">
                             <thead>
                                 <tr>
                                     <th>Subject</th>
@@ -226,58 +227,63 @@ const COEDashboard = () => {
                             <tbody>
                                 {upcomingExams.map(exam => (
                                     <tr key={exam.id}>
-                                        <td className="fw-600">{exam.subject}</td>
-                                        <td className="text-muted">{exam.code}</td>
+                                        <td style={{ fontWeight: 600 }}>{exam.subject}</td>
+                                        <td style={{ color: 'var(--text-muted)' }}>{exam.code}</td>
                                         <td>{exam.date}</td>
                                         <td>{exam.time}</td>
                                         <td>{exam.venue}</td>
-                                        <td><span className="status-badge warning">Scheduled</span></td>
+                                        <td><span className="coe-status-pill">SCHEDULED</span></td>
                                     </tr>
                                 ))}
+                                {upcomingExams.length === 0 && (
+                                    <tr>
+                                        <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>No upcoming exams found.</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
-
-
 
             </div>
 
             {/* RIGHT COLUMN - Sidebar */}
             <div className="dashboard-sidebar-col">
                 {/* 1. Profile Summary Card */}
-                <div className="dash-card profile-summary-card">
-                    <div className="profile-header-s">
-                        <div className="avatar-placeholder">{userData?.fullName?.charAt(0) || 'C'}</div>
-                        <div className="profile-text-s">
-                            <h4>{userData?.fullName || 'COE Admin'}</h4>
-                            <div className="status-row">
-                                <span className="status-dot"></span>
-                                <span className="status-text">Active</span>
-                                <span className="id-text">Role: COE</span>
-                            </div>
-                        </div>
+                <div className="coe-profile-card">
+                    <div className="coe-avatar">
+                        {userData?.fullName?.charAt(0) || 'C'}
+                    </div>
+                    <div className="coe-profile-name">
+                        {userData?.fullName || 'COE'}
+                    </div>
+                    <div className="coe-role-line">
+                        <span className="coe-status-circle"></span>
+                        <span style={{ color: '#10b981', fontWeight: 600, marginRight: '4px' }}>Active</span> Role: COE
                     </div>
                 </div>
 
                 {/* 2. Recent Activity */}
-                <div className="dash-card activity-card">
-                    <h3>Recent Activity</h3>
-                    <div className="timeline-list">
+                <div className="coe-dash-card">
+                    <div className="coe-card-header" style={{ marginBottom: '1.25rem' }}>
+                        <h3>Recent Activity</h3>
+                    </div>
+                    <div className="coe-timeline">
                         {recentActivities.map((act) => (
-                            <div key={act.id} className="timeline-item">
-                                <div className="t-dot blue"></div>
-                                <div className="t-content">
-                                    <div className="t-title">{act.action}</div>
-                                    <div className="t-desc">{act.detail}</div>
-                                    <div className="t-time">{act.time}</div>
+                            <div key={act.id} className="coe-timeline-item">
+                                <div className="coe-dot"></div>
+                                <div>
+                                    <div className="coe-act-title">{act.action}</div>
+                                    <div className="coe-act-detail">{act.detail}</div>
+                                    <div className="coe-act-time">{act.time}</div>
                                 </div>
                             </div>
                         ))}
+                        {recentActivities.length === 0 && (
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No recent activity.</div>
+                        )}
                     </div>
                 </div>
-
-
 
             </div>
         </div>

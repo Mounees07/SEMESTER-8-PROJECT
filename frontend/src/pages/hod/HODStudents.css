@@ -1,4 +1,6 @@
-.hod-faculty-container-new {
+/* HODStudents.css */
+
+.hod-students-container-new {
     padding: 24px 32px;
     background: #F8FAFC;
     min-height: 100vh;
@@ -6,112 +8,33 @@
     font-family: 'Inter', sans-serif;
 }
 
-/* Shared Top Nav Styles - Mimicking Dashboard */
-.hod-top-nav-shared {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #FFFFFF;
-    padding: 12px 24px;
-    margin: -24px -32px 32px -32px;
-    border-bottom: 1px solid #E2E8F0;
-}
-
-.search-bar-container-shared {
-    position: relative;
-    width: 320px;
-}
-
-.search-icon-shared {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #94A3B8;
-}
-
-.hod-search-input-shared {
-    width: 100%;
-    padding: 10px 16px 10px 40px;
-    border: 1px solid #E2E8F0;
-    border-radius: 8px;
-    font-size: 14px;
-    color: #334155;
-    background: #FFFFFF;
-    outline: none;
-    transition: all 0.2s;
-}
-
-.hod-search-input-shared:focus {
-    border-color: #3B82F6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.nav-actions-shared {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.icon-btn-shared {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    color: #64748B;
-    border-radius: 8px;
-    padding: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.icon-btn-shared:hover {
-    background: #F1F5F9;
-    color: #0F172A;
-}
-
-.primary-btn-shared {
-    background: #2563EB;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: background 0.2s;
-}
-
-.primary-btn-shared:hover {
-    background: #1D4ED8;
-}
-
 /* Page Header */
-.faculty-page-header {
+.students-page-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
     margin-bottom: 24px;
 }
 
-.faculty-page-header h1 {
+.students-page-header h1 {
     font-size: 24px;
     font-weight: 700;
     margin: 0 0 4px 0;
     color: #0F172A;
 }
 
-.faculty-page-header p {
+.students-page-header p {
     font-size: 14px;
     color: #64748B;
     margin: 0;
 }
 
-.export-csv-btn {
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.import-btn {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
     padding: 8px 16px;
@@ -126,20 +49,39 @@
     transition: all 0.2s;
 }
 
-.export-csv-btn:hover {
+.import-btn:hover {
     background: #F8FAFC;
     border-color: #CBD5E1;
 }
 
+.add-student-btn {
+    background: #2563EB;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-student-btn:hover {
+    background: #1D4ED8;
+}
+
 /* Stat Cards */
-.faculty-stats-grid {
+.students-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 20px;
     margin-bottom: 24px;
 }
 
-.f-stat-card {
+.s-stat-card {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
     border-radius: 12px;
@@ -148,66 +90,65 @@
     flex-direction: column;
 }
 
-.f-stat-header {
+.s-stat-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
 }
 
-.f-stat-label {
+.s-stat-label {
     font-size: 13px;
     color: #64748B;
     font-weight: 500;
 }
 
-.f-stat-icon {
+.s-stat-icon {
     color: #94A3B8;
 }
 
-.f-stat-value {
+.s-stat-value {
     font-size: 32px;
     font-weight: 700;
     color: #0F172A;
     margin-bottom: 8px;
 }
 
-.f-stat-trend {
+.s-stat-trend {
     font-size: 12px;
     font-weight: 500;
 }
 
-.f-stat-trend.positive {
+.s-stat-trend.positive {
     color: #10B981;
 }
 
-.f-stat-trend.neutral {
+.s-stat-trend.negative {
+    color: #10B981;
+}
+
+/* Negative trend for at-risk is good */
+.s-stat-trend.neutral {
     color: #94A3B8;
 }
 
-.f-stat-trend.text-muted {
+.s-stat-trend.text-muted {
     color: #64748B;
 }
 
 /* Directory Container & Toolbar */
-.faculty-directory-card {
+.students-directory-card {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
     border-radius: 12px;
     overflow: hidden;
 }
 
-.directory-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding: 16px 20px 0;
-    border-bottom: 1px solid #E2E8F0;
-}
-
 .directory-tabs {
     display: flex;
     gap: 24px;
+    padding: 20px 24px 0;
+    border-bottom: 1px solid #E2E8F0;
 }
 
 .dir-tab {
@@ -231,9 +172,16 @@
     border-bottom-color: #2563EB;
 }
 
+.directory-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #E2E8F0;
+}
+
 .directory-search {
     position: relative;
-    margin-bottom: 12px;
     width: 250px;
 }
 
@@ -259,6 +207,45 @@
     border-color: #94A3B8;
 }
 
+.directory-filters {
+    display: flex;
+    gap: 12px;
+}
+
+.filter-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.filter-dropdown:hover {
+    background: #F8FAFC;
+}
+
+.icon-btn-filter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #64748B;
+    cursor: pointer;
+}
+
+.icon-btn-filter:hover {
+    background: #F8FAFC;
+}
+
 /* Directory Table */
 .directory-table-wrapper {
     overflow-x: auto;
@@ -271,7 +258,7 @@
 
 .directory-table th {
     text-align: left;
-    padding: 16px 20px;
+    padding: 16px 24px;
     font-size: 12px;
     font-weight: 500;
     color: #64748B;
@@ -280,7 +267,7 @@
 }
 
 .directory-table td {
-    padding: 16px 20px;
+    padding: 16px 24px;
     border-bottom: 1px solid #E2E8F0;
     vertical-align: middle;
 }
@@ -294,13 +281,13 @@
 }
 
 /* Cells formatting */
-.personnel-cell {
+.student-cell {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.personnel-avatar {
+.student-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -314,49 +301,67 @@
     font-size: 14px;
 }
 
-.personnel-avatar img {
+.student-avatar img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.personnel-info {
+.student-info {
     display: flex;
     flex-direction: column;
 }
 
-.personnel-name {
+.student-name {
     font-size: 14px;
     font-weight: 600;
     color: #0F172A;
 }
 
-.personnel-role {
+.student-id {
     font-size: 12px;
     color: #64748B;
     margin-top: 2px;
 }
 
-.specialization-cell {
-    font-size: 14px;
-    color: #334155;
-}
-
-.contact-cell {
+.program-cell {
     display: flex;
     flex-direction: column;
 }
 
-.contact-email {
+.program-name {
     font-size: 14px;
     font-weight: 500;
     color: #334155;
 }
 
-.contact-room {
+.program-type {
     font-size: 12px;
     color: #94A3B8;
     margin-top: 2px;
+}
+
+.year-cell {
+    display: flex;
+    flex-direction: column;
+}
+
+.year-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+}
+
+.year-level {
+    font-size: 12px;
+    color: #94A3B8;
+    margin-top: 2px;
+}
+
+.gpa-cell {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0F172A;
 }
 
 /* Status Badges */
@@ -372,14 +377,14 @@
     color: white;
 }
 
-.status-leave {
-    background: #F59E0B;
+.status-warning {
+    background: #F97316;
     color: white;
 }
 
-.status-sabbatical {
+.status-leave {
     background: #F1F5F9;
-    color: #64748B;
+    color: #94A3B8;
     border: 1px solid #E2E8F0;
 }
 
@@ -403,7 +408,7 @@
 
 /* Footer Section */
 .directory-footer {
-    padding: 16px 20px;
+    padding: 16px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -442,41 +447,4 @@
 .page-nav-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-/* CRUD Actions in Table */
-.faculty-crud-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.crud-btn {
-    background: none;
-    border: none;
-    border-radius: 6px;
-    padding: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.crud-btn.edit {
-    color: #3B82F6;
-    background: rgba(59, 130, 246, 0.05);
-}
-
-.crud-btn.edit:hover {
-    background: rgba(59, 130, 246, 0.15);
-}
-
-.crud-btn.delete {
-    color: #EF4444;
-    background: rgba(239, 68, 68, 0.05);
-}
-
-.crud-btn.delete:hover {
-    background: rgba(239, 68, 68, 0.15);
 }

@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
-import { Loader, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Loader, CheckCircle, AlertTriangle } from 'lucide-react';
+import { SEMESTER_START_DATE, calculateAttendance } from '../../utils/attendanceUtils';
+import { useSettings } from '../../context/SettingsContext';
 import './StudentAttendance.css';
 
 const StudentAttendance = () => {
     const { currentUser } = useAuth();
+    const { settings: liveSettings } = useSettings();
+
+    // Read admin-configured threshold (fallback 75 if not yet loaded)
+    const threshold = Number(liveSettings?.['policy.attendance.threshold'] ?? 75);
+    const detainThreshold = Number(liveSettings?.['policy.attendance.detain'] ?? 65);
+
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [alreadyMarked, setAlreadyMarked] = useState(false);
@@ -45,70 +53,127 @@ const StudentAttendance = () => {
             const res = await api.post(`/attendance/mark?studentUid=${currentUser.uid}`);
             setAlreadyMarked(true);
             setTodayStatus(res.data);
-            fetchData(); // Refresh list
+            fetchData();
             alert(`Attendance Marked: ${res.data.status}`);
         } catch (err) {
-            alert("Failed: " + (err.response?.data?.error || err.message));
+            alert('Failed: ' + (err.response?.data?.error || err.message));
         }
     };
 
-    // Calculate pagination derived state
+    // ─── Attendance Calculation (shared utility) ────────────────────────────────
+    const { percentage, presentDays, absentDays, totalWorkingDays } = calculateAttendance(history);
+
+    const semesterStartLabel = SEMESTER_START_DATE.toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric',
+    });
+
+    // Status colour — uses live threshold from admin settings
+    const getStatusColor = (pct) => {
+        if (pct >= threshold + 10) return { color: '#10b981', label: 'Excellent' };
+        if (pct >= threshold) return { color: '#f59e0b', label: 'Satisfactory' };
+        if (pct >= detainThreshold) return { color: '#ef4444', label: 'Low – Action Required' };
+        return { color: '#dc2626', label: 'Risk of Detainment' };
+    };
+    const statusInfo = getStatusColor(percentage);
+
+    // Pagination
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentHistory = history.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(history.length / itemsPerPage);
 
-    const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
+    const handlePageChange = (page) => setCurrentPage(page);
 
     if (loading) return <div className="loading-screen"><Loader className="animate-spin" /></div>;
 
     return (
         <div className="attendance-page">
+            {/* ── Header ── */}
             <div className="attendance-header">
-                <h1>My Attendance</h1>
+                <div>
+                    <h1>My Attendance</h1>
+                    <p className="att-subtext">
+                        Tracking from {semesterStartLabel} · Sundays excluded
+                    </p>
+                </div>
                 <div className="mark-section">
-                    {alreadyMarked ? (
-                        <div className="marked-badge">
-                            <CheckCircle size={24} /> Attendance Marked for Today
-                        </div>
-                    ) : (
-                        <button className="btn-mark" onClick={handleMarkAttendance}>
-                            <CheckCircle size={20} /> Mark Attendance for Today
-                        </button>
-                    )}
+                    <button
+                        className="btn-mark"
+                        onClick={handleMarkAttendance}
+                        disabled={alreadyMarked}
+                        style={{ opacity: alreadyMarked ? 0.8 : 1 }}
+                    >
+                        <CheckCircle size={16} /> {alreadyMarked ? 'Marked' : 'Mark for today'}
+                    </button>
                 </div>
             </div>
 
+            {/* ── Stats Cards ── */}
             <div className="attendance-stats">
-                <div className="stat-card">
-                    <h3>Total Present</h3>
-                    <p>{history.length}</p>
+                {/* Attendance Status Card */}
+                <div className="stat-card stat-card-left-align">
+                    <h3>ATTENDANCE</h3>
+                    <p className="stat-value-text">
+                        {percentage >= threshold
+                            ? `${percentage}%`
+                            : `Below ${threshold}% threshold`}
+                    </p>
+                    <span className="att-status-pill" style={{
+                        background: percentage >= threshold ? '#dcfce7' : percentage >= detainThreshold ? '#fef08a' : '#fee2e2',
+                        color: percentage >= threshold ? '#166534' : percentage >= detainThreshold ? '#a16207' : '#991b1b'
+                    }}>
+                        {statusInfo.label}
+                    </span>
                 </div>
-                {/* Future: Add Absent count if we track total days */}
+
+                <div className="stat-card stat-card-left-align">
+                    <h3>PRESENT DAYS</h3>
+                    <p className="stat-value">{presentDays}</p>
+                    <span className="stat-sub">out of {totalWorkingDays} working days</span>
+                </div>
+
+                <div className="stat-card stat-card-left-align">
+                    <h3>ABSENT DAYS</h3>
+                    <p className="stat-value">{absentDays}</p>
+                    <span className="stat-sub">Sundays not counted</span>
+                </div>
+
+                <div className="stat-card stat-card-left-align">
+                    <h3>WORKING DAYS</h3>
+                    <p className="stat-value">{totalWorkingDays}</p>
+                    <span className="stat-sub">since {semesterStartLabel}</span>
+                </div>
             </div>
 
-            <div className="history-list glass-card">
-                <h2>Attendance History</h2>
+            {/* ── History Table ── */}
+            <div className="history-section">
+                <div className="history-header">
+                    <h2>Attendance History</h2>
+                    <span className="history-subtext">Recent entries • Latest on top</span>
+                </div>
+
                 {history.length === 0 ? (
                     <p className="empty-text">No attendance records found.</p>
                 ) : (
-                    <>
+                    <div className="table-container">
                         <table className="attendance-table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Time</th>
-                                    <th>Status</th>
+                                    <th className="col-id">#</th>
+                                    <th className="col-date">Date</th>
+                                    <th className="col-time">Time</th>
+                                    <th className="col-status">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {currentHistory.map(record => (
+                                {currentHistory.map((record, idx) => (
                                     <tr key={record.id}>
-                                        <td>{record.date}</td>
-                                        <td>{record.checkInTime}</td>
-                                        <td>
+                                        <td className="col-id">{indexOfFirstItem + idx + 1}</td>
+                                        <td className="col-date">{record.date}</td>
+                                        <td className="col-time">{record.checkInTime}</td>
+                                        <td className="col-status">
                                             <span className={`status-badge ${record.status === 'LATE' ? 'status-late' : 'status-present'}`}>
-                                                {record.status}
+                                                {record.status === 'LATE' ? 'LATE' : 'PRESENT'}
                                             </span>
                                         </td>
                                     </tr>
@@ -116,44 +181,19 @@ const StudentAttendance = () => {
                             </tbody>
                         </table>
 
-                        {totalPages > 1 && (
-                            <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', padding: '20px', gap: '15px', alignItems: 'center' }}>
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    style={{
-                                        padding: '5px 10px',
-                                        background: 'rgba(255,255,255,0.1)',
-                                        border: '1px solid rgba(255,255,255,0.2)',
-                                        color: 'white',
-                                        borderRadius: '4px',
-                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                                        opacity: currentPage === 1 ? 0.5 : 1
-                                    }}
-                                >
-                                    Previous
-                                </button>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                    Page <span style={{ color: 'white', fontWeight: 'bold' }}>{currentPage}</span> of {totalPages}
-                                </span>
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    style={{
-                                        padding: '5px 10px',
-                                        background: 'rgba(255,255,255,0.1)',
-                                        border: '1px solid rgba(255,255,255,0.2)',
-                                        color: 'white',
-                                        borderRadius: '4px',
-                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                                        opacity: currentPage === totalPages ? 0.5 : 1
-                                    }}
-                                >
-                                    Next
-                                </button>
+                        <div className="pagination-controls">
+                            <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
+                                Previous
+                            </button>
+                            <div className="pagination-numbers">
+                                {/* Page Buttons could go here, but for now we'll match simple style */}
+                                <span>Page <strong>{currentPage}</strong> of {totalPages > 0 ? totalPages : 1}</span>
                             </div>
-                        )}
-                    </>
+                            <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages}>
+                                Next
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>

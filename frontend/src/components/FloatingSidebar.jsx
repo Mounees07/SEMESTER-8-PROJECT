@@ -15,7 +15,8 @@ import {
     TrendingUp,
     ClipboardCheck,
     User,
-    LogOut
+    LogOut,
+    DollarSign
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './FloatingSidebar.css';
@@ -35,7 +36,7 @@ const FloatingSidebar = () => {
         { to: '/dashboard', icon: <LayoutDashboard size={22} />, label: 'Dashboard' },
         { to: '/teacher/courses', icon: <BookOpen size={22} />, label: 'My Courses' },
         { to: '/mentees', icon: <Users size={22} />, label: 'My Mentees' },
-        { to: '/marking-attendance', icon: <UserCheck size={22} />, label: 'Attendance' },
+        { to: '/teacher/marking-attendance', icon: <UserCheck size={22} />, label: 'Attendance' },
         { to: '/grading', icon: <ClipboardList size={22} />, label: 'Grading' },
         { to: '/schedule', icon: <Calendar size={22} />, label: 'Schedule' },
     ];
@@ -61,7 +62,8 @@ const FloatingSidebar = () => {
     const adminLinks = [
         { to: '/admin/dashboard', icon: <LayoutDashboard size={22} />, label: 'Dashboard' },
         { to: '/admin/students', icon: <GraduationCap size={22} />, label: 'Students' },
-        { to: '/admin/users', icon: <Users size={22} />, label: 'Teachers' },
+        { to: '/admin/users', icon: <Users size={22} />, label: 'User Management' },
+        { to: '/admin/finance', icon: <DollarSign size={22} />, label: 'Finance' },
         { to: '/calendar', icon: <Calendar size={22} />, label: 'Calendar' },
         { to: '/admin/courses', icon: <BookOpen size={22} />, label: 'Courses' },
         { to: '/admin/reports', icon: <FileText size={22} />, label: 'Reports' },

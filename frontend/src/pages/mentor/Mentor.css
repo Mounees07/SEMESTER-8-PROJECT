@@ -10,7 +10,7 @@
 }
 
 [data-theme='dark'] .mw-container {
-    background-color: #0f172a;
+    background-color: transparent;
     color: #f1f5f9;
 }
 
@@ -102,8 +102,8 @@
 }
 
 [data-theme='dark'] .mw-tabs {
-    background: #1e293b;
-    border-color: #334155;
+    background: var(--bg-secondary);
+    border-color: var(--glass-border);
 }
 
 .mw-tab-btn {
@@ -209,8 +209,8 @@
 }
 
 [data-theme='dark'] .mw-card {
-    background: #1e293b;
-    border-color: #334155;
+    background: var(--bg-secondary);
+    border-color: var(--glass-border);
 }
 
 .mw-card-header {
@@ -279,8 +279,8 @@
 }
 
 [data-theme='dark'] .mw-snap-item {
-    background: #0f172a;
-    border-color: #1e293b;
+    background: var(--bg-secondary);
+    border-color: var(--glass-border);
 }
 
 .snap-label {
@@ -434,8 +434,8 @@
 }
 
 [data-theme='dark'] .mw-mentee-item {
-    background: #1e293b;
-    border-color: #334155;
+    background: var(--bg-secondary);
+    border-color: var(--glass-border);
 }
 
 .mw-mentee-item:hover {
@@ -646,8 +646,8 @@
 }
 
 [data-theme='dark'] .kanban-card {
-    background: #1e293b;
-    border-color: #334155;
+    background: var(--bg-secondary);
+    border-color: var(--glass-border);
 }
 
 .kanban-card:hover {

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { GraduationCap, Mail, Lock, AlertCircle, Eye, EyeOff, Home, ChevronDown, X } from 'lucide-react';
+import { GraduationCap, Mail, Lock, AlertCircle, Eye, EyeOff, Home, ChevronDown, X, UserPlus } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
 import './Login.css';
 
 const Login = () => {
@@ -11,6 +12,8 @@ const Login = () => {
     const [formError, setFormError] = useState("");
     const [showContact, setShowContact] = useState(false);
     const { loginWithGoogle, loginWithEmail, error } = useAuth();
+    const { getBool } = useSettings();
+    const allowRegistration = getBool('allowRegistration', true);
     const navigate = useNavigate();
 
     const handleGoogleLogin = async () => {
@@ -98,6 +101,33 @@ const Login = () => {
                     <button type="submit" className="btn btn-primary btn-block">
                         Sign In
                     </button>
+
+                    {/* Registration banner controlled by admin setting */}
+                    {allowRegistration ? (
+                        <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-muted, #6b7280)' }}>
+                            New user?{' '}
+                            <Link to="/register" style={{ color: '#8b5cf6', fontWeight: 600, textDecoration: 'none' }}>
+                                <UserPlus size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                                Request Access
+                            </Link>
+                        </div>
+                    ) : (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            background: 'rgba(239,68,68,0.08)',
+                            border: '1px solid rgba(239,68,68,0.2)',
+                            color: '#ef4444',
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <AlertCircle size={15} />
+                            <span>Registration is currently <strong>disabled</strong> by the administrator.</span>
+                        </div>
+                    )}
                 </form>
 
                 <div className="social-login-section">

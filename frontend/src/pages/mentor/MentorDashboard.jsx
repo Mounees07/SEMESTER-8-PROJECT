@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, Plus, Users, ClipboardCheck, Bell, Loader, BookOpen, FileEdit, ArrowLeft, CheckCircle, List, LayoutGrid, Filter, MoreHorizontal, X, Clock, Trash2, Edit2, Smartphone } from 'lucide-react';
 import './Mentor.css';
 import { useAuth } from '../../context/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 
 const MentorDashboard = () => {
     const { currentUser, userData } = useAuth();
-    const [activeTab, setActiveTab] = useState('Only faculty');
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const [activeTab, setActiveTab] = useState('Faculty');
     const [activeMenteeFilter, setActiveMenteeFilter] = useState('All');
 
     // Log Attendance States
@@ -18,6 +23,16 @@ const MentorDashboard = () => {
 
     const [isViewingBoard, setIsViewingBoard] = useState(false);
     const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+    const [isNewCheckInModalOpen, setIsNewCheckInModalOpen] = useState(false);
+    const [checkInData, setCheckInData] = useState({
+        mentee: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '10:30',
+        topic: 'Academic progress',
+        notes: '',
+        actionItem: '',
+        requiresFollowUp: true
+    });
     const [editingTaskId, setEditingTaskId] = useState(null);
     const [newTaskLabels, setNewTaskLabels] = useState(['PRIORITY']);
 
@@ -35,14 +50,49 @@ const MentorDashboard = () => {
         description: ''
     });
 
+    const [recentInteractions, setRecentInteractions] = useState(() => {
+        const saved = localStorage.getItem('mentor_interactions');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [isViewingMenteeDetails, setIsViewingMenteeDetails] = useState(false);
+    const [selectedMentee, setSelectedMentee] = useState(null);
+    const [activeMenteeHistoryTab, setActiveMenteeHistoryTab] = useState('All Notes');
+    const [isEditMenteeModalOpen, setIsEditMenteeModalOpen] = useState(false);
+    const [editMenteeData, setEditMenteeData] = useState({ rollNumber: '', department: '', semester: '', studentStatus: '' });
+
     useEffect(() => {
         localStorage.setItem('mentor_tasks', JSON.stringify(tasks));
     }, [tasks]);
 
+    useEffect(() => {
+        localStorage.setItem('mentor_interactions', JSON.stringify(recentInteractions));
+    }, [recentInteractions]);
+
+    useEffect(() => {
+        if (location.state && location.state.isViewingMenteeDetails && location.state.selectedMentee) {
+            setSelectedMentee(location.state.selectedMentee);
+            setIsViewingMenteeDetails(true);
+            setActiveTab('Mentor'); // Ensure we switch to mentor tab
+            // Optional: clear the state so a refresh doesn't pop it open unexpectedly
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state, navigate]);
+
+    useEffect(() => {
+        if (isNewCheckInModalOpen || isNewTaskModalOpen || isEditMenteeModalOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isNewCheckInModalOpen, isNewTaskModalOpen, isEditMenteeModalOpen]);
+
     const handleSaveTask = () => {
         if (!newTaskData.title.trim()) return;
 
-        const isFacultyTask = activeTab === 'Only faculty';
+        const isFacultyTask = activeTab === 'Faculty';
 
         if (editingTaskId) {
             setTasks(prev => prev.map(t => t.id === editingTaskId ? {
@@ -119,7 +169,7 @@ const MentorDashboard = () => {
     };
 
     const getColTasks = (colName) => {
-        const isFacultyTask = activeTab === 'Only faculty';
+        const isFacultyTask = activeTab === 'Faculty';
         return tasks.filter(t =>
             t.column.toLowerCase() === colName.toLowerCase() &&
             (t.isFacultyTask === isFacultyTask || t.isFacultyTask === undefined)
@@ -151,7 +201,7 @@ const MentorDashboard = () => {
 
     useEffect(() => {
         if (userData && userData.role === 'TEACHER') {
-            setActiveTab('Only faculty');
+            setActiveTab('Faculty');
         }
     }, [userData]);
 
@@ -249,7 +299,7 @@ const MentorDashboard = () => {
         fetchSchedules();
     }, [selectedSectionId, selectedDate, facultySections]);
 
-    // Fetch roster when secton selected in Log Attendance
+    // Fetch roster when section OR date changes in Log Attendance
     useEffect(() => {
         const fetchRoster = async () => {
             if (!selectedSectionId) {
@@ -270,28 +320,38 @@ const MentorDashboard = () => {
                 let fetchId = null;
                 let isActive = false;
 
-                // Try fetching active session
-                try {
-                    const activeRes = await api.get(`/course-attendance/sessions/section/${selectedSectionId}/active`);
-                    if (activeRes.data && activeRes.data.id) {
-                        fetchId = activeRes.data.id;
-                        isActive = true;
-                        setGeneratedOtp(activeRes.data.otp);
-                        setActiveSessionId(fetchId);
+                // Only check for an active OTP session when viewing today
+                const todayStr = new Date().toISOString().split('T')[0];
+                const isViewingToday = selectedDate === todayStr;
+
+                if (isViewingToday) {
+                    try {
+                        const activeRes = await api.get(`/course-attendance/sessions/section/${selectedSectionId}/active`);
+                        if (activeRes.data && activeRes.data.id) {
+                            fetchId = activeRes.data.id;
+                            isActive = true;
+                            setGeneratedOtp(activeRes.data.otp);
+                            setActiveSessionId(fetchId);
+                        }
+                    } catch (e) {
+                        setActiveSessionId(null);
+                        setGeneratedOtp(null);
                     }
-                } catch (e) {
+                } else {
+                    // Viewing a past date — clear any live OTP state
                     setActiveSessionId(null);
                     setGeneratedOtp(null);
                 }
 
-                // If not active, try fetching today's last session
+                // If no active session found, find any session matching the selected date
                 if (!fetchId) {
                     try {
                         const sessionsRes = await api.get(`/course-attendance/sessions/section/${selectedSectionId}`);
                         const sessions = sessionsRes.data || [];
-                        const today = new Date().toDateString();
-                        const todaySession = sessions.find(s => new Date(s.createdAt).toDateString() === today);
-                        if (todaySession) fetchId = todaySession.id;
+                        // Compare against the selectedDate the user chose (not always today)
+                        const selectedDateStr = new Date(selectedDate + 'T00:00:00').toDateString();
+                        const matchedSession = sessions.find(s => new Date(s.createdAt).toDateString() === selectedDateStr);
+                        if (matchedSession) fetchId = matchedSession.id;
                     } catch (e) { }
                 }
 
@@ -324,7 +384,7 @@ const MentorDashboard = () => {
             }
         };
         fetchRoster();
-    }, [selectedSectionId]);
+    }, [selectedSectionId, selectedDate]);
 
     const getInitials = (name) => {
         if (!name) return 'S';
@@ -351,6 +411,15 @@ const MentorDashboard = () => {
         if (activeMenteeFilter === 'Action required') {
             return (gpa && gpa < 7.0) || (attendance && attendance < 75);
         }
+
+        if (activeMenteeFilter === 'Recent meetings') {
+            return recentInteractions.some(interaction => String(interaction.menteeId) === String(mentee.id));
+        }
+
+        if (activeMenteeFilter === 'No recent activity') {
+            return !recentInteractions.some(interaction => String(interaction.menteeId) === String(mentee.id));
+        }
+
         return true;
     });
 
@@ -395,7 +464,7 @@ const MentorDashboard = () => {
         );
     }
 
-    const isFaculty = activeTab === 'Only faculty';
+    const isFaculty = activeTab === 'Faculty';
 
     const handleLogAttendanceClick = () => {
         setIsLoggingAttendance(true);
@@ -529,7 +598,7 @@ const MentorDashboard = () => {
                     </div>
                     <div className="log-att-actions">
                         <button className="mw-btn-outline" onClick={() => setIsLoggingAttendance(false)}>Cancel</button>
-                        {attendanceMode === 'manual' && (
+                        {attendanceMode === 'manual' && selectedDate === new Date().toISOString().split('T')[0] && (
                             <button className="mw-btn-primary" onClick={handleSaveAttendance}>Save Attendance</button>
                         )}
                     </div>
@@ -593,18 +662,25 @@ const MentorDashboard = () => {
                         <button
                             onClick={() => setAttendanceMode('otp')}
                             className={`mw-tab-btn ${attendanceMode === 'otp' ? 'active' : ''}`}
+                            title={selectedDate !== new Date().toISOString().split('T')[0] ? 'OTP is only available for today' : ''}
                         >
                             <Smartphone size={14} style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline' }} /> OTP Verification
+                            {selectedDate !== new Date().toISOString().split('T')[0] && (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '6px', opacity: 0.5 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                            )}
                         </button>
                         <button
                             onClick={() => setAttendanceMode('manual')}
                             className={`mw-tab-btn ${attendanceMode === 'manual' ? 'active' : ''}`}
                         >
                             <List size={14} style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline' }} /> Manual Entry
+                            {selectedDate !== new Date().toISOString().split('T')[0] && (
+                                <span style={{ marginLeft: '6px', fontSize: '10px', background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>VIEW ONLY</span>
+                            )}
                         </button>
                     </div>
 
-                    {attendanceMode === 'manual' && (
+                    {attendanceMode === 'manual' && selectedDate === new Date().toISOString().split('T')[0] && (
                         <button className="mw-text-btn" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={markAllPresent}>
                             <CheckCircle size={14} /> Mark all as Present
                         </button>
@@ -615,7 +691,27 @@ const MentorDashboard = () => {
                     <div className="otp-attendance-layout" style={{ display: 'flex', gap: '24px', alignItems: 'stretch' }}>
                         {/* LEFT COLUMN: OTP GENERATION / DISPLAY */}
                         <div className="otp-control-panel" style={{ flex: '1', backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-                            {!generatedOtp ? (
+                            {selectedDate !== new Date().toISOString().split('T')[0] ? (
+                                /* ── Past date: read-only historical notice ── */
+                                <div style={{ textAlign: 'center', margin: '40px auto', maxWidth: '360px' }}>
+                                    <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                        </svg>
+                                    </div>
+                                    <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '10px', color: '#334155' }}>Historical Record</h2>
+                                    <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                                        You are viewing attendance for <strong>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
+                                        OTP generation is only available for today's sessions.
+                                    </p>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', background: '#fef9ec', border: '1px solid #fde68a', color: '#92400e', fontSize: '13px', fontWeight: '600' }}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                        Switch to today to generate a new OTP
+                                    </div>
+                                </div>
+                            ) : !generatedOtp ? (
+                                /* ── Today, no active OTP yet ── */
                                 <div className="generate-otp-prompt" style={{ textAlign: 'center', margin: '40px auto' }}>
                                     <Smartphone size={48} color="#6366f1" style={{ margin: '0 auto 20px' }} />
                                     <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '12px', color: '#1e293b' }}>Generate Session OTP</h2>
@@ -628,6 +724,7 @@ const MentorDashboard = () => {
                                     </button>
                                 </div>
                             ) : (
+                                /* ── Today, active OTP session running ── */
                                 <div className="active-otp-display" style={{ textAlign: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
                                         <span style={{ height: '10px', width: '10px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 10px rgba(16, 185, 129, 0.6)' }} className="pulse-dot"></span>
@@ -658,7 +755,11 @@ const MentorDashboard = () => {
                         {/* RIGHT COLUMN: RECENTLY VERIFIED CARDS */}
                         <div className="otp-participants-panel" style={{ width: '420px', backgroundColor: '#f8fafc', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
                             <h4 style={{ margin: '0 0 20px 0', color: '#1e293b', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Users size={18} className="text-indigo-500" /> Today's Verified Students ({otpVerifiedStudents.length})
+                                <Users size={18} className="text-indigo-500" />
+                                {selectedDate === new Date().toISOString().split('T')[0]
+                                    ? "Today's"
+                                    : new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                                } Verified Students ({otpVerifiedStudents.length})
                             </h4>
                             {otpVerifiedStudents.length > 0 ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '500px', paddingRight: '4px' }}>
@@ -689,6 +790,12 @@ const MentorDashboard = () => {
                                             <Loader size={28} className="animate-spin text-slate-400" style={{ margin: '0 auto 12px auto' }} />
                                             <h5 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#334155', fontWeight: '600' }}>Waiting for Responses</h5>
                                             <p style={{ margin: 0, color: '#64748b', fontSize: '13px', lineHeight: '1.5' }}>As students enter the code, their verification cards will appear here.</p>
+                                        </>
+                                    ) : selectedDate !== new Date().toISOString().split('T')[0] ? (
+                                        <>
+                                            <ClipboardCheck size={32} color="#cbd5e1" style={{ margin: '0 auto 12px auto' }} />
+                                            <h5 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#334155', fontWeight: '600' }}>No attendance records found</h5>
+                                            <p style={{ margin: 0, color: '#64748b', fontSize: '13px', lineHeight: '1.5' }}>No OTP or manual attendance was logged for this course on {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.</p>
                                         </>
                                     ) : (
                                         <>
@@ -734,18 +841,24 @@ const MentorDashboard = () => {
                                                 <button
                                                     className={`toggle-btn btn-p ${currentStatus === 'P' ? 'active' : ''}`}
                                                     onClick={() => handleStatusChange(student.id, 'P')}
+                                                    disabled={selectedDate !== new Date().toISOString().split('T')[0]}
+                                                    style={selectedDate !== new Date().toISOString().split('T')[0] ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                                 >
                                                     P
                                                 </button>
                                                 <button
                                                     className={`toggle-btn btn-a ${currentStatus === 'A' ? 'active' : ''}`}
                                                     onClick={() => handleStatusChange(student.id, 'A')}
+                                                    disabled={selectedDate !== new Date().toISOString().split('T')[0]}
+                                                    style={selectedDate !== new Date().toISOString().split('T')[0] ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                                 >
                                                     A
                                                 </button>
                                                 <button
                                                     className={`toggle-btn btn-l ${currentStatus === 'L' ? 'active' : ''}`}
                                                     onClick={() => handleStatusChange(student.id, 'L')}
+                                                    disabled={selectedDate !== new Date().toISOString().split('T')[0]}
+                                                    style={selectedDate !== new Date().toISOString().split('T')[0] ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                                 >
                                                     L
                                                 </button>
@@ -755,9 +868,11 @@ const MentorDashboard = () => {
                                             <input
                                                 type="text"
                                                 className="remark-input"
-                                                placeholder="Add remark..."
+                                                placeholder={selectedDate !== new Date().toISOString().split('T')[0] ? 'View only' : 'Add remark...'}
                                                 value={currentRemark}
                                                 onChange={(e) => handleRemarkChange(student.id, e.target.value)}
+                                                disabled={selectedDate !== new Date().toISOString().split('T')[0]}
+                                                style={selectedDate !== new Date().toISOString().split('T')[0] ? { opacity: 0.5, cursor: 'not-allowed', background: '#f8fafc' } : {}}
                                             />
                                         </td>
                                     </tr>
@@ -775,10 +890,170 @@ const MentorDashboard = () => {
         );
     }
 
+    const renderNewCheckInModal = () => {
+        if (!isNewCheckInModalOpen) return null;
+
+        const checkInTopics = [
+            'Academic progress', 'Career & Internships', 'Personal counseling',
+            'Attendance issue', 'General check-in'
+        ];
+
+        return createPortal(
+            <div className="task-modal-overlay">
+                <div className="task-modal-card animate-slide-up" style={{ width: '480px' }}>
+                    <div className="task-modal-header" style={{ alignItems: 'flex-start' }}>
+                        <div>
+                            <h2>New Check-in</h2>
+                            <p className="task-modal-subtitle" style={{ fontSize: '0.75rem', marginTop: '4px', margin: 0, color: 'var(--text-muted)' }}>Record a mentoring session or interaction.</p>
+                        </div>
+                        <button className="task-modal-close" onClick={() => setIsNewCheckInModalOpen(false)}>
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="task-modal-body" style={{ gap: '1.25rem' }}>
+                        <div className="task-form-group">
+                            <label className="task-form-label">Mentee</label>
+                            <div className="input-icon-wrap" style={{ position: 'relative' }}>
+                                <Users size={16} className="input-icon" style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                                <select
+                                    className="task-form-select"
+                                    style={{ paddingLeft: '2.5rem', appearance: 'auto' }}
+                                    value={checkInData.mentee}
+                                    onChange={e => setCheckInData({ ...checkInData, mentee: e.target.value })}
+                                >
+                                    <option value="" style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>Select a mentee...</option>
+                                    {mentees.map(m => (
+                                        <option key={m.id} value={m.id} style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>{m.fullName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="task-form-row">
+                            <div className="task-form-group half-width">
+                                <label className="task-form-label">Date</label>
+                                <div className="input-icon-wrap" style={{ position: 'relative' }}>
+                                    <input type="date" className="task-form-input" value={checkInData.date} onChange={e => setCheckInData({ ...checkInData, date: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="task-form-group half-width">
+                                <label className="task-form-label">Time</label>
+                                <div className="input-icon-wrap" style={{ position: 'relative' }}>
+                                    <input type="time" className="task-form-input" value={checkInData.time} onChange={e => setCheckInData({ ...checkInData, time: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="task-form-group">
+                            <label className="task-form-label">Topic / Area</label>
+                            <div className="task-labels-container" style={{ gap: '8px' }}>
+                                {checkInTopics.map(topic => {
+                                    const isSelected = checkInData.topic === topic;
+                                    return (
+                                        <span
+                                            key={topic}
+                                            className="topic-badge"
+                                            style={{
+                                                padding: '6px 12px',
+                                                fontSize: '0.75rem',
+                                                borderRadius: '20px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                border: '1px solid',
+                                                borderColor: isSelected ? 'var(--primary)' : 'var(--glass-border)',
+                                                backgroundColor: isSelected ? 'var(--primary)' : 'transparent',
+                                                color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onClick={() => setCheckInData({ ...checkInData, topic })}
+                                        >
+                                            {topic}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="task-form-group">
+                            <label className="task-form-label">Session Notes</label>
+                            <textarea
+                                className="task-form-input"
+                                rows={4}
+                                placeholder="Discussed recent performance in internal assessments. Student is doing well but needs to focus more on practical applications. Recommended joining the upcoming technical workshop."
+                                style={{ resize: 'none' }}
+                                value={checkInData.notes}
+                                onChange={e => setCheckInData({ ...checkInData, notes: e.target.value })}
+                            ></textarea>
+                        </div>
+
+                        <div className="task-form-group">
+                            <label className="task-form-label">Action Items</label>
+                            <div className="input-icon-wrap" style={{ position: 'relative' }}>
+                                <Plus size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                                <input
+                                    type="text"
+                                    className="task-form-input"
+                                    placeholder="Add a follow-up task..."
+                                    style={{ borderStyle: 'dashed', paddingLeft: '2.5rem' }}
+                                    value={checkInData.actionItem}
+                                    onChange={e => setCheckInData({ ...checkInData, actionItem: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="task-form-group" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                            <div>
+                                <label className="task-form-label" style={{ marginBottom: '4px', display: 'block', color: 'var(--text-primary)' }}>Requires follow-up</label>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, fontWeight: '500' }}>Flag this interaction for a future review</p>
+                            </div>
+                            <div
+                                onClick={() => setCheckInData({ ...checkInData, requiresFollowUp: !checkInData.requiresFollowUp })}
+                                style={{
+                                    width: '36px', height: '20px', borderRadius: '12px',
+                                    background: checkInData.requiresFollowUp ? 'var(--primary)' : 'var(--glass-border)',
+                                    position: 'relative', cursor: 'pointer', transition: 'background 0.3s'
+                                }}
+                            >
+                                <div style={{
+                                    width: '16px', height: '16px', borderRadius: '50%', background: 'white',
+                                    position: 'absolute', top: '2px', left: checkInData.requiresFollowUp ? '18px' : '2px',
+                                    transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                }}></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="task-modal-footer">
+                        <button className="task-cancel-btn" onClick={() => setIsNewCheckInModalOpen(false)}>Cancel</button>
+                        <button className="task-create-btn" onClick={() => {
+                            if (checkInData.mentee) {
+                                const menteeObj = mentees.find(m => String(m.id) === String(checkInData.mentee));
+                                const menteeName = menteeObj ? (menteeObj.fullName || 'Unknown Student') : 'Mentee';
+                                const newInteraction = {
+                                    id: Date.now(),
+                                    menteeId: checkInData.mentee,
+                                    title: `${checkInData.topic} with ${menteeName}`,
+                                    date: `${checkInData.date} \u00B7 ${checkInData.time}`,
+                                    notes: checkInData.notes || 'No extensive notes provided.'
+                                };
+                                setRecentInteractions([newInteraction, ...recentInteractions]);
+                                setActiveMenteeFilter('Recent meetings');
+                            }
+                            setIsNewCheckInModalOpen(false);
+                            setCheckInData({ ...checkInData, mentee: '', notes: '', actionItem: '' });
+                        }}>Save Check-in</button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
     const renderNewTaskModal = () => {
         if (!isNewTaskModalOpen) return null;
 
-        return (
+        return createPortal(
             <div className="task-modal-overlay">
                 <div className="task-modal-card animate-slide-up">
                     <div className="task-modal-header">
@@ -897,6 +1172,203 @@ const MentorDashboard = () => {
                     <div className="task-modal-footer">
                         <button className="task-cancel-btn" onClick={closeTaskModal}>Cancel</button>
                         <button className="task-create-btn" onClick={handleSaveTask}>{editingTaskId ? 'Save Changes' : 'Create Task'}</button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
+    const renderMenteeDetails = () => {
+        if (!selectedMentee) return null;
+
+        const menteeInteractions = recentInteractions.filter(int => String(int.menteeId) === String(selectedMentee.id));
+
+        let filteredHistory = menteeInteractions;
+        if (activeMenteeHistoryTab === 'Counseling') {
+            filteredHistory = menteeInteractions.filter(i => i.title.toLowerCase().includes('counseling') || i.title.toLowerCase().includes('general'));
+        } else if (activeMenteeHistoryTab === 'Academic') {
+            filteredHistory = menteeInteractions.filter(i => i.title.toLowerCase().includes('academic') || i.title.toLowerCase().includes('attendance') || i.title.toLowerCase().includes('career'));
+        } else if (activeMenteeHistoryTab === 'Disciplinary') {
+            filteredHistory = menteeInteractions.filter(i => i.title.toLowerCase().includes('issue') || i.title.toLowerCase().includes('disciplinary'));
+        }
+
+        const dept = selectedMentee.department || 'Dept Not Assigned';
+        const sem = selectedMentee.semester ? `Sem ${selectedMentee.semester}` : 'Sem Not Assigned';
+        const rollNo = selectedMentee.rollNumber || 'Not Assigned';
+        const gpa = selectedMentee.gpa;
+        const attendance = selectedMentee.attendance;
+        const arrears = selectedMentee.arrearCount !== undefined && selectedMentee.arrearCount !== null ? selectedMentee.arrearCount : '0';
+        // Assume internalAvg comes from backend later, fallback if null
+        const internalAvg = selectedMentee.internalAvg || 'N/A';
+
+        let badgeClass = "on-track";
+        let badgeText = "On Track";
+        if (selectedMentee.studentStatus) {
+            badgeText = selectedMentee.studentStatus;
+            badgeClass = badgeText.toLowerCase().includes('track') ? 'on-track' : 'high-priority';
+        } else {
+            if (gpa && gpa < 7.0) {
+                badgeClass = "high-priority";
+                badgeText = "High priority";
+            } else if (attendance && attendance < 75) {
+                badgeClass = "high-priority";
+                badgeText = "Low Attd.";
+            }
+        }
+
+        return (
+            <div className="mentee-details-view animate-fade-in" style={{ padding: '0 0px', marginTop: '16px' }}>
+                <div className="mw-card" style={{ marginBottom: '24px', padding: '24px 32px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '24px' }}>
+                        <span style={{ cursor: 'pointer', color: 'var(--primary)' }} onClick={() => setIsViewingMenteeDetails(false)}>My Mentees</span>
+                        <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>&gt;</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.fullName || 'Student'}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                            <div className={`mentee-avatar bg-indigo`} style={{ width: '72px', height: '72px', fontSize: '2.2rem', borderRadius: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', flexShrink: 0 }}>
+                                {getInitials(selectedMentee.fullName)}
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <h2 style={{ fontSize: '1.6rem', margin: '0', textTransform: 'uppercase', color: 'var(--text-primary)', fontWeight: '800' }}>{selectedMentee.fullName || 'Unknown Student'}</h2>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '500' }}>
+                                    <span>{sem} {dept}</span>
+                                    <span>&middot;</span>
+                                    <span>Roll: {rollNo}</span>
+                                    <span>&middot;</span>
+                                    <span className={`mw-badge-pill ${badgeClass}`} style={{ padding: '4px 10px', fontSize: '0.75rem', fontWeight: '600' }}>{badgeText}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <button className="mw-text-btn" style={{ background: 'transparent', border: '1px solid var(--glass-border)', padding: '8px 12px', borderRadius: '8px', color: 'var(--text-primary)', fontWeight: '600', display: 'flex', alignItems: 'center', fontSize: '0.9rem' }} onClick={() => {
+                                setEditMenteeData({
+                                    rollNumber: selectedMentee.rollNumber || '',
+                                    department: selectedMentee.department || '',
+                                    semester: selectedMentee.semester || '',
+                                    studentStatus: selectedMentee.studentStatus || badgeText
+                                });
+                                setIsEditMenteeModalOpen(true);
+                            }}><Edit2 size={16} /> Edit</button>
+                            <button className="mw-text-btn" style={{ background: 'transparent', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', color: 'var(--text-primary)', fontWeight: '600', display: 'flex', alignItems: 'center', fontSize: '0.9rem' }}><BookOpen size={16} style={{ marginRight: '8px' }} /> Message</button>
+                            <button className="mw-btn-primary" style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: '600', display: 'flex', alignItems: 'center', fontSize: '0.9rem' }} onClick={() => {
+                                setCheckInData(prev => ({ ...prev, mentee: String(selectedMentee.id) }));
+                                setIsNewCheckInModalOpen(true);
+                            }}><Plus size={18} style={{ marginRight: '6px' }} /> Log Interaction</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mw-grid" style={{ marginTop: 0 }}>
+                    {/* Left Column */}
+                    <div className="mw-main">
+                        <div className="mw-card">
+                            <div className="mw-card-header space-between" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                                <div>
+                                    <h2>Student Profile</h2>
+                                </div>
+                                <button className="mw-text-btn">View full records</button>
+                            </div>
+                            <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: 'bold' }}>Email Address</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.email || 'Not provided'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: 'bold' }}>Phone Number</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.mobileNumber || 'Not provided'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: 'bold' }}>Parent Contact</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.parentContact || 'Not provided'} {selectedMentee.fatherName ? `(${selectedMentee.fatherName})` : ''}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: 'bold' }}>Accommodation</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.hostellerDayScholar === 'Hosteller' ? `${selectedMentee.hostelName || 'Hostel'} (Room ${selectedMentee.hostelRoomNo || 'N/A'})` : (selectedMentee.hostellerDayScholar || 'Not provided')}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: 'bold' }}>Date of Birth</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.dob || selectedMentee.studentDetails?.dob || 'Not provided'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: 'bold' }}>Mentoring Batch</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{selectedMentee.batch || 'Not provided'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mw-card">
+                            <div className="mw-card-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                                <h2>Mentoring History</h2>
+                                <p>Past counseling sessions, meetings, and general notes</p>
+                            </div>
+                            <div className="mw-filters" style={{ padding: '0 24px', marginBottom: '16px' }}>
+                                {['All Notes', 'Counseling', 'Academic', 'Disciplinary'].map(filter => (
+                                    <button
+                                        key={filter}
+                                        onClick={() => setActiveMenteeHistoryTab(filter)}
+                                        className={`mw-filter-btn ${activeMenteeHistoryTab === filter ? 'active' : ''}`}
+                                        style={{ margin: 0, marginRight: '8px' }}
+                                    >
+                                        {filter}
+                                    </button>
+                                ))}
+                            </div>
+                            <div style={{ padding: '0 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                {filteredHistory.length === 0 ? (
+                                    <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 0' }}>No history found for this category.</p>
+                                ) : (
+                                    filteredHistory.map(interaction => (
+                                        <div key={interaction.id} style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '16px', background: 'var(--bg-subtle)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>{interaction.title.split(' with ')[0]}</h4>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{interaction.date}</span>
+                                            </div>
+                                            <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{interaction.notes}</p>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <span className="mw-badge-pill" style={{ background: 'var(--glass-bg)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)' }}>{interaction.title.split(' with ')[0]}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="mw-sidebar">
+
+
+                        <div className="mw-card">
+                            <div className="mw-card-header" style={{ borderBottom: 'none', paddingBottom: '12px' }}>
+                                <h2 style={{ color: 'var(--text-primary)' }}>Academic Snapshot</h2>
+                                <p>Current semester performance</p>
+                            </div>
+                            <div style={{ padding: '0 24px 24px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div className="dashed-box" style={{ padding: '16px', borderRadius: '8px', border: '1px dashed var(--glass-border)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Current CGPA</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{gpa || 'N/A'}</div>
+                                </div>
+                                <div className="dashed-box" style={{ padding: '16px', borderRadius: '8px', borderStyle: 'dashed', borderWidth: '1px', borderColor: attendance && attendance < 75 ? '#f59e0b' : 'var(--glass-border)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Attendance</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: attendance && attendance < 75 ? '#f59e0b' : 'var(--text-primary)' }}>{attendance ? `${attendance}%` : 'N/A'}</div>
+                                </div>
+                                <div className="dashed-box" style={{ padding: '16px', borderRadius: '8px', border: '1px dashed var(--glass-border)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Active Arrears</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: arrears > 0 ? '#ef4444' : 'var(--text-primary)' }}>{arrears}</div>
+                                </div>
+                                <div className="dashed-box" style={{ padding: '16px', borderRadius: '8px', border: '1px dashed var(--glass-border)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Internal Avg</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{internalAvg}</div>
+                                </div>
+                            </div>
+                        </div>
+
+
                     </div>
                 </div>
             </div>
@@ -1116,31 +1588,57 @@ const MentorDashboard = () => {
                             <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '1rem' }}>No mentees found matching criteria.</p>
                         ) : (
                             filteredMentees.slice(0, 4).map((mentee, index) => {
-                                const dept = mentee.studentDetails?.department || '';
-                                const sem = mentee.studentDetails?.semester ? `Sem ${mentee.studentDetails.semester}` : '';
-                                const gpa = mentee.studentDetails?.gpa || mentee.gpa;
-                                const attendance = mentee.studentDetails?.attendance || mentee.attendance;
+                                const dept = mentee.department || 'Dept Not Assigned';
+                                const sem = mentee.semester ? `Sem ${mentee.semester}` : 'Sem Not Assigned';
+                                const gpa = mentee.gpa;
+                                const attendance = mentee.attendance;
 
                                 let badgeClass = "on-track";
                                 let badgeText = "On Track";
-                                let subtitle = `${sem} ${dept} · Everything looks good`.trim();
+                                let subtitle = `${sem} · ${dept}`.trim();
 
-                                if (gpa && gpa < 7.0) {
+                                if (mentee.studentStatus) {
+                                    badgeText = mentee.studentStatus;
+                                    // Use specific color classes based on exact dropdown choices
+                                    if (badgeText === 'On Track') badgeClass = 'on-track';
+                                    else if (badgeText === 'Needs Follow-up') badgeClass = 'follow-up';
+                                    else badgeClass = 'high-priority';
+
+                                    subtitle = `${sem} · ${dept} · ${badgeText}`.trim();
+                                } else if (gpa && gpa < 7.0) {
                                     badgeClass = "high-priority";
                                     badgeText = "High priority";
-                                    subtitle = `${sem} ${dept} · Low GPA requires attention`.trim();
+                                    subtitle = `${sem} · ${dept} · Low GPA requires attention`.trim();
                                 } else if (attendance && attendance < 75) {
                                     badgeClass = "high-priority";
                                     badgeText = "Low Attd.";
-                                    subtitle = `${sem} ${dept} · Attendance requires attention`.trim();
+                                    subtitle = `${sem} · ${dept} · Attendance requires attention`.trim();
                                 } else if (index % 2 !== 0 && index > 0) {
                                     badgeClass = "follow-up";
                                     badgeText = "Follow up";
-                                    subtitle = `${sem} ${dept} · Needs check-in`.trim();
+                                    subtitle = `${sem} · ${dept} · Needs check-in`.trim();
+                                }
+
+                                if (activeMenteeFilter === 'Recent meetings') {
+                                    const latestInteraction = recentInteractions.find(interaction => String(interaction.menteeId) === String(mentee.id));
+                                    if (latestInteraction) {
+                                        subtitle = `${latestInteraction.title} · ${latestInteraction.notes}`.trim();
+                                        if (subtitle.length > 55) subtitle = subtitle.substring(0, 55) + '...';
+                                        badgeClass = "on-track";
+                                        badgeText = "Recent";
+                                    }
                                 }
 
                                 return (
-                                    <div className="mw-mentee-item" key={mentee.id || index}>
+                                    <div
+                                        className="mw-mentee-item"
+                                        key={mentee.id || index}
+                                        onClick={() => {
+                                            setSelectedMentee(mentee);
+                                            setIsViewingMenteeDetails(true);
+                                        }}
+                                        style={{ cursor: 'pointer', transition: 'background-color 0.2s', padding: '16px', borderRadius: '12px', marginBottom: '8px' }}
+                                    >
                                         <div className="mentee-info">
                                             <div className={`mentee-avatar ${getBgClass(index)}`}>
                                                 {getInitials(mentee.fullName)}
@@ -1255,21 +1753,25 @@ const MentorDashboard = () => {
                     </div>
 
                     <div className="mw-timeline">
-                        <div className="timeline-item">
-                            <div className="timeline-dot"></div>
-                            <div className="timeline-content">
-                                <h4>Dashboard Synchronized</h4>
-                                <p>Today · Extracted latest mentee statistics</p>
+                        {recentInteractions.length === 0 ? (
+                            <div className="timeline-item">
+                                <div className="timeline-dot"></div>
+                                <div className="timeline-content">
+                                    <h4>No recent activity</h4>
+                                    <p>Your logged interactions will appear here</p>
+                                </div>
                             </div>
-                        </div>
-
-                        <div className="timeline-item">
-                            <div className="timeline-dot"></div>
-                            <div className="timeline-content">
-                                <h4>Meeting functionality active</h4>
-                                <p>Live · Listening for newly scheduled meetings</p>
-                            </div>
-                        </div>
+                        ) : (
+                            recentInteractions.slice(0, 5).map(interaction => (
+                                <div className="timeline-item" key={interaction.id}>
+                                    <div className="timeline-dot"></div>
+                                    <div className="timeline-content">
+                                        <h4>{interaction.title}</h4>
+                                        <p>{interaction.date} &middot; {interaction.notes.substring(0, 50)}{interaction.notes.length > 50 ? '...' : ''}</p>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>
@@ -1519,7 +2021,7 @@ const MentorDashboard = () => {
     return (
         <div className="mw-container">
             {/* Main Header (Hidden when viewing Full Board) */}
-            {!isViewingBoard && (
+            {!isViewingBoard && !isViewingMenteeDetails && (
                 <header className="mw-header-wrap">
                     <div className="mw-header-left">
                         <div className="mw-badge">
@@ -1532,7 +2034,7 @@ const MentorDashboard = () => {
                     <div className="mw-header-right">
                         {userData?.role !== 'TEACHER' && (
                             <div className="mw-tabs">
-                                {['Combined', 'Only mentor', 'Only faculty'].map(tab => (
+                                {['Mentor', 'Faculty'].map(tab => (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
@@ -1546,21 +2048,96 @@ const MentorDashboard = () => {
                         <div className="mw-date">
                             <Calendar size={14} /> Today · {formatDate()}
                         </div>
-                        <button className="mw-btn-primary" onClick={isFaculty ? handleLogAttendanceClick : undefined}>
+                        <button className="mw-btn-primary" onClick={isFaculty ? handleLogAttendanceClick : () => setIsNewCheckInModalOpen(true)}>
                             <Plus size={14} /> {isFaculty ? 'Log attendance' : 'New check-in'}
                         </button>
                     </div>
                 </header>
             )}
 
-            {isViewingBoard
-                ? renderTasksBoardView()
-                : isLoggingAttendance && isFaculty
-                    ? renderLogAttendanceView()
-                    : (isFaculty ? renderFacultyView() : renderMentorView())
+            {isViewingMenteeDetails && selectedMentee
+                ? renderMenteeDetails()
+                : isViewingBoard
+                    ? renderTasksBoardView()
+                    : isLoggingAttendance && isFaculty
+                        ? renderLogAttendanceView()
+                        : (isFaculty ? renderFacultyView() : renderMentorView())
             }
 
             {renderNewTaskModal()}
+            {renderNewCheckInModal()}
+
+            {isEditMenteeModalOpen && createPortal(
+                <div className="task-modal-overlay">
+                    <div className="task-modal-card animate-slide-up" style={{ width: '400px' }}>
+                        <div className="task-modal-header">
+                            <div>
+                                <h2>Edit Mentee Profile</h2>
+                                <p className="task-modal-subtitle" style={{ fontSize: '0.75rem', marginTop: '4px', margin: 0, color: 'var(--text-muted)' }}>Update core details for {selectedMentee?.fullName}</p>
+                            </div>
+                            <button className="task-modal-close" onClick={() => setIsEditMenteeModalOpen(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="task-modal-body">
+                            <div className="form-group row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Roll Number</label>
+                                    <input type="text" className="form-control" value={editMenteeData.rollNumber} onChange={e => setEditMenteeData({ ...editMenteeData, rollNumber: e.target.value })} placeholder="e.g. 21CSE045" style={{ padding: '8px 12px', fontSize: '0.9rem' }} />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Status / Track</label>
+                                    <select className="form-control" value={editMenteeData.studentStatus} onChange={e => setEditMenteeData({ ...editMenteeData, studentStatus: e.target.value })} style={{ padding: '8px 12px', fontSize: '0.9rem', color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.05)', border: 'none' }}>
+                                        <option value="On Track" style={{ color: '#000' }}>On Track</option>
+                                        <option value="High priority" style={{ color: '#000' }}>High priority</option>
+                                        <option value="Low Attd." style={{ color: '#000' }}>Low Attd.</option>
+                                        <option value="Needs Follow-up" style={{ color: '#000' }}>Needs Follow-up</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="form-group row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Department</label>
+                                    <input type="text" className="form-control" value={editMenteeData.department} onChange={e => setEditMenteeData({ ...editMenteeData, department: e.target.value })} placeholder="e.g. CSE" style={{ padding: '8px 12px', fontSize: '0.9rem' }} />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Semester</label>
+                                    <input type="number" className="form-control" value={editMenteeData.semester} onChange={e => setEditMenteeData({ ...editMenteeData, semester: e.target.value })} placeholder="e.g. 6" style={{ padding: '8px 12px', fontSize: '0.9rem' }} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="task-modal-footer">
+                            <button className="task-cancel-btn" onClick={() => setIsEditMenteeModalOpen(false)}>Cancel</button>
+                            <button className="task-create-btn" onClick={async () => {
+                                try {
+                                    const updatePayload = {
+                                        rollNumber: editMenteeData.rollNumber,
+                                        department: editMenteeData.department,
+                                        semester: editMenteeData.semester ? parseInt(editMenteeData.semester) : null,
+                                        studentStatus: editMenteeData.studentStatus
+                                    };
+                                    const res = await api.put(`/users/${selectedMentee.firebaseUid}`, updatePayload);
+
+                                    // Update locally to reflect changes immediately
+                                    const updatedUserRes = await api.get(`/users/${selectedMentee.firebaseUid}`);
+                                    setSelectedMentee(updatedUserRes.data);
+
+                                    // If we rely on the mentees array for list updates
+                                    setMentees(prevMentees => {
+                                        if (!prevMentees) return prevMentees;
+                                        return prevMentees.map(m => m.firebaseUid === selectedMentee.firebaseUid ? updatedUserRes.data : m);
+                                    });
+                                    setIsEditMenteeModalOpen(false);
+                                } catch (error) {
+                                    console.error("Failed to update mentee", error);
+                                    alert("Could not update details.");
+                                }
+                            }}>Save Details</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

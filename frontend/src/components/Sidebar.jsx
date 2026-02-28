@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
     BookOpen,
@@ -18,12 +18,18 @@ import {
     Bird,
     DollarSign,
     MessageCircle,
-    LogOut
+    LogOut,
+    Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
     const { userData } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    const homeRoute = userData?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+    const isOnHome = location.pathname === homeRoute;
 
     const studentLinks = [
         { to: '/dashboard', icon: <LayoutDashboard size={22} />, label: 'Overview' },
@@ -37,7 +43,7 @@ const Sidebar = () => {
         { to: '/dashboard', icon: <LayoutDashboard size={22} />, label: 'Overview' },
         { to: '/teacher/courses', icon: <BookOpen size={22} />, label: 'My Courses' },
         { to: '/mentees', icon: <Users size={22} />, label: 'My Mentees' },
-        { to: '/marking-attendance', icon: <UserCheck size={22} />, label: 'Attendance' },
+        { to: '/teacher/marking-attendance', icon: <UserCheck size={22} />, label: 'Attendance' },
         { to: '/grading', icon: <ClipboardList size={22} />, label: 'Grading' },
         { to: '/study-materials', icon: <FileText size={22} />, label: 'Materials' },
         { to: '/meetings', icon: <CalendarIcon size={22} />, label: 'Meetings' },
@@ -59,6 +65,7 @@ const Sidebar = () => {
         { to: '/dashboard', icon: <LayoutDashboard size={22} />, label: 'Department' },
         { to: '/mentorship-management', icon: <UserCheck size={22} />, label: 'Mentorship' },
         { to: '/faculty-management', icon: <Users size={22} />, label: 'Faculty' },
+        { to: '/students-directory', icon: <GraduationCap size={22} />, label: 'Students' },
         { to: '/curriculum', icon: <BookOpen size={22} />, label: 'Curriculum' },
         { to: '/department-analytics', icon: <TrendingUp size={22} />, label: 'Analytics' },
         { to: '/hod/schedule-upload', icon: <CalendarIcon size={22} />, label: 'Class Timetable' },
@@ -78,7 +85,8 @@ const Sidebar = () => {
     const adminLinks = [
         { to: '/admin/dashboard', icon: <LayoutDashboard size={22} />, label: 'Dashboard' },
         { to: '/admin/students', icon: <GraduationCap size={22} />, label: 'Students' },
-        { to: '/admin/users', icon: <Users size={22} />, label: 'Teachers' }, // Rename User Mgmt to Teachers for now to closer match image
+        { to: '/admin/teachers', icon: <Users size={22} />, label: 'Faculty' },
+        { to: '/admin/users', icon: <Users size={22} />, label: 'User Management' },
         { to: '/calendar', icon: <CalendarIcon size={22} />, label: 'Calendar' },
         { to: '/admin/courses', icon: <BookOpen size={22} />, label: 'Course Management' },
         { to: '/admin/reports', icon: <FileText size={22} />, label: 'Reports' },
@@ -150,16 +158,34 @@ const Sidebar = () => {
 
             {/* Bottom Section (Settings/Logout) */}
             <div className="mt-auto w-full px-2 flex flex-col items-center gap-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                <NavLink to="/profile" className={({ isActive }) => `
-                    relative group flex items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-all duration-200
-                    ${isActive ? 'text-[#6366F1] bg-indigo-50 dark:text-indigo-400' : ''}
-                `}>
-                    <User size={20} />
-                    <div className="absolute left-full ml-4 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-all duration-200 z-[60] shadow-xl">
-                        Profile
-                        <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
-                    </div>
-                </NavLink>
+
+                {/* Home / Back button — shown on all non-dashboard pages */}
+                {!isOnHome && (
+                    <button
+                        onClick={() => navigate(homeRoute)}
+                        title="Back to Dashboard"
+                        className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-all duration-200 cursor-pointer"
+                    >
+                        <Home size={20} />
+                        <div className="absolute left-full ml-4 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-all duration-200 z-[60] shadow-xl">
+                            Back to Dashboard
+                            <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                        </div>
+                    </button>
+                )}
+
+                {userData?.role === 'STUDENT' && (
+                    <NavLink to="/profile" className={({ isActive }) => `
+                        relative group flex items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-all duration-200
+                        ${isActive ? 'text-[#6366F1] bg-indigo-50 dark:text-indigo-400' : ''}
+                    `}>
+                        <User size={20} />
+                        <div className="absolute left-full ml-4 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-all duration-200 z-[60] shadow-xl">
+                            Profile
+                            <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                        </div>
+                    </NavLink>
+                )}
 
                 <div
                     onClick={() => window.location.href = '/login'}

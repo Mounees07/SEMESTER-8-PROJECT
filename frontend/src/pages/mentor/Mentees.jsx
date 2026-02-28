@@ -13,6 +13,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import '../../pages/DashboardOverview.css';
 import './Mentees.css';
@@ -20,6 +21,7 @@ import Pagination from '../../components/Pagination';
 
 const Mentees = () => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [mentees, setMentees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -242,10 +244,7 @@ const Mentees = () => {
                             <a href={`tel:${mentee.phone || '#'}`} className="contact-link"><Phone size={16} /></a>
 
                             <button className="btn btn-text" onClick={() => {
-                                setSelectedMentee(mentee);
-                                setEditForm(mentee);
-                                setIsEditing(false);
-                                setShowMeetingModal(false);
+                                navigate('/mentor/dashboard', { state: { selectedMentee: mentee, isViewingMenteeDetails: true } });
                             }}>
                                 Details <ExternalLink size={14} />
                             </button>
@@ -369,7 +368,7 @@ const Mentees = () => {
                                             <>
                                                 <div className="info-row"><span>CGPA:</span> <strong>{selectedMentee.gpa || '0.00'}</strong></div>
                                                 <div className="info-row"><span>Attendance:</span> <strong>{selectedMentee.attendance || '0'}%</strong></div>
-                                                <div className="info-row"><span>Arrears:</span> <strong>0</strong></div>
+                                                <div className="info-row"><span>Arrears:</span> <strong style={{ color: selectedMentee.arrearCount > 0 ? '#ef4444' : 'inherit' }}>{selectedMentee.arrearCount !== undefined && selectedMentee.arrearCount !== null ? selectedMentee.arrearCount : '0'}</strong></div>
                                             </>
                                         ) : (
                                             <div className="edit-grid">
